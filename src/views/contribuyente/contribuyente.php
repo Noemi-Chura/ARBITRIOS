@@ -53,6 +53,7 @@
             <td>
               <a class="btn" href="index.php?c=contribuyente&m=editar&id=<?= urlencode($row['id']) ?>">Editar</a>
               <a class="btn" href="index.php?c=contribuyente&m=eliminar&id=<?= urlencode($row['id']) ?>" onclick="return confirm('¿Eliminar este contribuyente?');">Eliminar</a>
+              <a class="btn" href="index.php?c=contribuyente&m=editar&id=<?= urlencode($row['id']) ?>">Arbitrios</a>
             </td>
           </tr>
         <?php endforeach; ?>

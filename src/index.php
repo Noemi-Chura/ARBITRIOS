@@ -1,9 +1,11 @@
 <?php
 require_once(__DIR__ . "/config.php");
+
 $c = $_GET['c'] ?? '';
 $m = $_GET['m'] ?? '';
 
 if (empty($c) && empty($m)) {
+    require_once(__DIR__ . "/views/layout/header.php");
     require_once(__DIR__ . "/views/layout/menu.php");
     echo "<main><h2>Bienvenido al sistema !</h2></main>";
     exit;
@@ -30,3 +32,4 @@ if (file_exists($controladorArchivo)) {
 } else {
     echo "<main>Error: archivo de controlador <b>$c</b> no encontrado.</main>";
 }
+?>
