@@ -1,0 +1,519 @@
+
+body {
+    background-color: #B2DFDB; 
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+.titulo {
+    display: flex;
+    justify-content: center;
+    background-color: #1c1f26;  
+    color: #f0f8ff;
+    border-radius: 3px;
+}
+
+nav {
+    width: 250px;
+    background-color: #0a1733; 
+    height: 100vh;
+    position: fixed;
+    padding-top: 10px;
+	padding-left: none; 
+}
+
+nav a {
+    display: flex;               /* Coloca ícono y texto en línea horizontal */
+    align-items: center;         /* Alinea verticalmente */
+    gap: 10px;         
+    color: white;
+    padding: 16px 130px 20px 15px;
+    text-decoration: none;
+    position: relative;
+    font-weight: bold;
+    font-size: 17px;
+    background-color: #0a1733;
+    transition: background-color 0.3s ease;
+	border: none;   
+}
+
+nav a i {
+    margin-right: 10px;
+}
+
+nav a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    background-color: white;
+    left: 0;
+    bottom: 0;
+    transition: width 0.3s ease;
+}
+
+nav a:hover {
+    background-color: #142952;  /* Azul más claro al pasar el mouse */
+    border-radius: 5px;
+}
+
+
+main {
+    margin-left: 250px;
+	justify-content: center;
+    padding: 20px;
+    width: calc(100% - 250px); /* Resta el ancho del menú lateral */
+    box-sizing: border-box; /* Para que padding no aumente el ancho total */
+}
+.cuerpo{
+    display: flex;
+    justify-content: space-between;
+    margin: 30px;
+}
+
+.form-pasajero{
+	border: 1.5px solid #daf1ff;
+    background-color: #daf1ff;
+    border-radius: 5px;
+	padding-left: 20px; 
+	padding-right: 20px;
+}
+.ingresaDatos{
+    border: 1px solid #c1ceca;
+    padding: 0px;
+    margin: 0px;
+    width: 400px;
+    border-radius: 4px;
+}
+
+/* TITULO DE DATOS */
+.tituloDatos{
+  margin-bottom: 5px;
+  text-align: center;
+  color: #ffffff;
+  background-color: #2b302f;
+  border-radius: 3px;
+}
+/*BOTONES DE RADIO MAX MIN */
+.maxmin{
+    display: flex;
+    justify-content:space-around ;
+}
+.objetivo{
+  font-weight: bold;
+  cursor: pointer;
+  padding: 5px;
+  margin: 1px;
+  border: 1px solid #2b302f;
+  border-radius: 5px;
+}
+.objetivo:hover {
+  background-color: #286090;
+  transition: 0.4s;
+}
+input[type="radio"] {
+  display: none;
+}
+
+/* BOTON DE INGRESAR DATOS */
+.contBoton{
+    display: flex;
+    justify-content: center;
+    
+}
+button {
+  padding: 10px 20px;
+  margin: 2px;
+  font-size: 16px;
+  background-color: #2b302f;
+  color: white;
+  border: 1px solid #2b302f;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: #ffffff;
+  color: #2b302f;
+  transition: 0.4s;
+}
+
+.boton-centro{
+  text-align: center; /* Centra el botón horizontalmente */
+  margin-top: 20px;
+  width: 100%; 
+}
+
+/* INGRESO INPUTS NUMBER */
+input[type="number"], input[type="text"]{
+  width: 100px;
+  height: 20px; /* Altura más visible y cómoda */
+  padding: 5px 8px;
+  font-size: 14px;
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  background-color: #f9f9f9;
+  color: #333;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+/* Al enfocar */
+input[type="number"]:focus, input[type="text"]:focus {
+  border-color: #2b302f;
+  background-color: #fff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+/* TABLA DATOS INICIALES */
+.celdaInput{
+    display: flex;
+    justify-content: center;
+}
+
+
+
+.datosIniciales table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  color: #333;
+}
+
+.datosIniciales th, 
+.datosIniciales td {
+  /* border: 1px solid #ddd; */
+  text-align: left;
+}
+
+.datosIniciales th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.datosIniciales tr:nth-child(even) {
+  background-color: #fafafa; /* filas alternas para mayor claridad */
+}
+
+.datosIniciales tr:hover {
+  background-color: #f0f8ff; /* color al pasar el mouse */
+}
+
+/* TABLE GENERADA */
+.contenedorTabla{
+    /* border: 1px solid #333; */
+    padding: 0;
+    margin: 0;
+}
+
+
+.informacion-viaje {
+    border: 1.5px solid #daf1ff;
+    background-color: #daf1ff;
+    border-radius: 5px;
+    margin-left: 20px; 
+	padding-left: 20px;
+}
+
+.viaje {
+  display: inline-block;
+  background-color: #daf1ff;
+  border: 1.5px solid #daf1ff;
+  border-radius: 5px;
+  padding: 20px 30px;
+  margin: 30px auto;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+
+.viaje h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.viaje form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.viaje label {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.viaje select,
+.viaje input[type="date"],
+.viaje input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.viaje button {
+  padding: 10px;
+  background-color: #007bff;
+  border: none;
+  color: white;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.viaje button:hover {
+  background-color: #0056b3;
+}
+
+.datoC {
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+ 
+}
+
+.datoC section {
+  background-color: #ffffff;
+  padding: 30px 40px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  width: 400px; /* tamaño mediano */
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.datoC h3 {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.datoC form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.datoC label {
+  font-weight: bold;
+}
+
+.datoC input[type="text"],
+.datoC select {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+.datoC input[readonly] {
+  background-color: #f2f2f2;
+}
+
+.datoC input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+#datosFactura {
+  padding-left: 16px;
+  border-left: 3px solid #ccc;
+  margin-top: 10px;
+}
+
+.datoC button {
+  margin-top: 20px;
+  padding: 12px;
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.datoC button:hover {
+  background-color: #0056b3;
+}
+
+.resumenV {
+  display: flex;
+  justify-content: center;
+  align-items: stretch; /* 💡 esto es clave */
+  padding: 40px 20px;
+  height: 100%; /* asegurate que herede bien */
+}
+
+
+.resumenV section {
+  background-color: #ffffff;
+  padding: 30px 40px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  width: 250px;
+}
+
+/* SELECT */
+td select {
+    display: flex;
+    justify-content: center;
+
+    padding: 6px 10px;
+    font-size: 17px;
+    color: #333;
+    background-color: #fff;
+    border: 1.5px solid #ccc;
+    border-radius: 5px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+     background-repeat: no-repeat;
+    background-position: right 10px center;
+    /* background-size: 12px; */
+    cursor: pointer;
+}
+
+td select:focus {
+  border-color: #333;
+  box-shadow: 0 0 4px rgba(0, 123, 255, 0.3);
+}
+.condiciones{
+    display: flex;
+    justify-content: right;
+}
+
+th{
+    background-color: #2b302f;
+    color: #fff;
+    padding: 7px;
+    border-radius: 3px;
+    margin: 0;
+    font-size: 14px;
+}
+table{
+    margin: 0;
+    padding: 0;
+}
+h3{
+  font-size: 20px;
+  margin: 15px;
+}
+
+.nombre{
+  color: #2b302f;
+  border-radius: 2px;
+  padding: 2px 12px;
+  margin: 1px;
+  font-size: 15px;
+}
+
+
+.casilla-todas {
+  background-color:#f2f2f2;
+}
+
+.casilla-posible {
+  background-color: #add8e6; 
+}
+
+.casilla-mejor {
+  background-color: #ffeb3b;
+  font-weight: bold;
+  border: 2px solid #fbc02d;
+}
+
+.btn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 6px 12px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-right: 5px;
+}
+
+.btn:hover {
+    background-color: #45a049;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+    border: 1px solid #888;
+}
+
+th, td {
+    border: 1px solid #aaa;
+    padding: 8px;
+}
+
+th {
+    background-color: #2471a3;
+	border-radius: 1px;
+}
+
+
+.form-grid input[type="text"],
+.form-grid input[type="email"],
+.form-grid input[type="date"],
+.form-grid select {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  box-sizing: border-box; /* Importante: incluye padding/border en el ancho total */
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+ .form1 {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px; /* Borde redondeado del formulario */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+  }
+  
+  input, select, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  
+}
+input[type="text"] {
+  width: 100%;              /* hace que el input se ajuste al contenedor */
+  padding: 10px;            /* espacio interior */
+  border: 1px solid #ccc;   /* borde visible */
+  border-radius: 6px;       /* puntas redondeadas */
+  box-sizing: border-box;   /* evita que el padding se sume al ancho */
+}
+
+
+.btn {
+    background-color: #007BFF;
+    color: white;
+    font-weight: bold;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+
+  .btn:hover {
+    background-color: #0056b3;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
