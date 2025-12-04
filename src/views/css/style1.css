@@ -517,3 +517,472 @@ input[type="text"] {
     display: flex;
     flex-direction: column;
   }
+
+  .arb-header {
+    background: #ffffff;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0;
+  }
+
+  .arb-contrib {
+    background: #6aaedc;
+    color: #ffffff;
+    padding: 0;
+    border-radius: 0;
+    margin: 0;
+    box-shadow: none;
+    font-weight: normal;
+  }
+
+  .arb-contrib table td {
+    padding: 0;
+    vertical-align: middle;
+    border: none !important;
+  }
+
+  .arb-fullwidth-wrapper{
+    width: calc(100% + 40px);
+    margin-left: -20px;
+    margin-right: -20px;
+    padding: 0;
+    margin-top: -20px;
+  }
+
+  .arb-title{
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #1c1f26;
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    font-size: 28px;
+    padding: 8px 12px;
+  }
+
+  .arb-title-icon{
+    font-size: 28px;
+    color: #1c1f26;
+  }
+
+  .arb-table{
+    width:100%;
+    border-collapse: collapse;
+    table-layout: auto;
+  }
+
+  .arb-label{
+    font-weight: bold;
+    color: #ffffff;
+    padding: 0 6px 0 6px;
+    white-space: nowrap;
+  }
+
+  .arb-value{
+    color: #ffffff;
+    padding: 0 6px 0 6px;
+    white-space: nowrap;
+  }
+
+  .arb-table th, .arb-table td {
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .arb-table{
+    border: none !important;
+    background: transparent !important;
+  }
+  .arb-table td, .arb-table th{
+    border-color: transparent !important;
+    background: transparent !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    white-space: nowrap !important;
+  }
+  .arb-row{ display: grid; grid-template-columns: 50% 50%; gap: 0; align-items: center; }
+  .arb-left{ grid-column: 1; }
+  .arb-right{ grid-column: 2; }
+  .arb-domicilio{ grid-column: 1 / -1; }
+  .arb-inline{ display: flex; align-items: center; gap: 12px; }
+  .arb-inline .arb-label, .arb-inline .arb-value{ padding-top:10px; padding-bottom:10px; }
+  .arb-header + .arb-contrib{ margin-top: 0; }
+
+  /* Tabla de Predios */
+  .arb-table-section {
+    margin-top: 20px;
+    margin-left: 20px;
+    margin-right: 20px;
+    padding: 0;
+    background: transparent;
+  }
+
+  .arb-table-wrapper {
+    overflow-x: auto;
+    max-height: calc(33.33vh);
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #ffffff00;
+  }
+
+  .arb-predios-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: #ffffff;
+  }
+
+  .arb-predios-table thead {
+    background-color: #2b302f;
+    color: white;
+    position: sticky;
+    top: 0;
+  }
+
+  .arb-predios-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: bold;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+  }
+
+  .arb-predios-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    background: #ffffff;
+  }
+
+  .arb-predios-table tbody tr:hover {
+    background-color: #f5f5f5;
+  }
+
+  .arb-actions {
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .arb-actions button {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    margin: 0 4px;
+    padding: 0;
+    text-align: center;
+    line-height: 28px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+  }
+
+  .arb-actions a {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    margin: 0 4px;
+    text-align: center;
+    line-height: 28px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+  }
+
+  .btn-ver {
+    background-color: #007bff;
+    color: white;
+  }
+
+  .btn-ver:hover {
+    background-color: #0056b3;
+  }
+
+  .btn-editar {
+    background-color: #28a745;
+    color: white;
+  }
+
+  .btn-editar:hover {
+    background-color: #218838;
+  }
+
+  .btn-eliminar {
+    background-color: #dc3545;
+    color: white;
+  }
+
+  .btn-eliminar:hover {
+    background-color: #c82333;
+  }
+
+  /* Botones de acción */
+  .arb-buttons-section {
+    display: flex;
+    gap: 12px;
+    margin-top: 0;
+    margin-left: 20px;
+    margin-right: 20px;
+    margin-bottom: 0;
+    padding: 16px 0;
+    background: transparent;
+    border-top: none;
+  }
+
+  .btn-primary, .btn-secondary {
+    flex: 1;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background-color: #007bff;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background-color: #0056b3;
+  }
+
+  .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background-color: #545b62;
+  }
+
+  /* Modal */
+  .arb-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    animation: fadeIn 0.3s ease;
+  }
+
+  .arb-modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .arb-modal-content {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateY(-50px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .arb-modal-horizontal {
+    max-width: 650px;
+  }
+
+  .arb-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    background-color: #f9f9f9;
+  }
+
+  .arb-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #2b302f;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .arb-modal-header h2 i {
+    font-size: 22px;
+    color: #007bff;
+  }
+
+  .arb-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.3s ease;
+  }
+
+  .arb-modal-close:hover {
+    color: #333;
+  }
+
+  .arb-modal-body {
+    padding: 20px;
+  }
+
+  #formAgregarPredio {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .arb-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .arb-form-group label {
+    font-weight: bold;
+    color: #2b302f;
+    font-size: 14px;
+  }
+
+  .arb-form-group input[type="text"],
+  .arb-form-group select {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+  }
+
+  .arb-form-group input[type="text"]:focus,
+  .arb-form-group select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+  }
+
+  .arb-form-group input[readonly] {
+    background-color: #f2f2f2;
+    cursor: not-allowed;
+  }
+
+  /* Búsqueda de predios */
+  .arb-select-search {
+    position: relative;
+  }
+
+  .arb-search-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .arb-dropdown-list {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ccc;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1001;
+    margin-top: -1px;
+  }
+
+  .arb-dropdown-list.active {
+    display: block;
+  }
+
+  .arb-dropdown-item {
+    padding: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  .arb-dropdown-item:hover {
+    background-color: #f0f0f0;
+  }
+
+  .arb-dropdown-item.selected {
+    background-color: #e7f3ff;
+    font-weight: bold;
+  }
+
+  /* Botones del formulario */
+  .arb-form-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .btn-grabar, .btn-cancelar {
+    flex: 1;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-grabar {
+    background-color: #28a745;
+    color: white;
+  }
+
+  .btn-grabar:hover {
+    background-color: #218838;
+  }
+
+  .btn-cancelar {
+    background-color: #6c757d;
+    color: white;
+  }
+
+  .btn-cancelar:hover {
+    background-color: #545b62;
+  }
+
+  .text-center {
+    text-align: center;
+  }
