@@ -4,7 +4,7 @@ class Modelo {
 
     public function __construct() {
         try {
-            // Conexión al contenedor postgres_local
+            // Conexión al servicio postgres en la red Docker
             $this->db = new PDO(
                 "pgsql:host=postgres;
                 port=5432;
