@@ -11,9 +11,22 @@ class ContribuyenteController {
 
     // Mostrar lista de contribuyentes
     public function index() {
-        $dato = $this->modelo->mostrar("gen.gen_contribuyente", "1=1");
+        $busqueda = $_GET['busqueda'] ?? '';
+        $condicion = "1=1";
+        
+        if (!empty($busqueda)) {
+            // Buscar por nombre, DNI o RUC
+            $busquedaSegura = addslashes($busqueda);
+            $condicion = "(nombre ILIKE '%{$busquedaSegura}%' OR 
+                          dni ILIKE '%{$busquedaSegura}%' OR 
+                          ruc ILIKE '%{$busquedaSegura}%' OR
+                          nro_documento_identidad ILIKE '%{$busquedaSegura}%')";
+        }
+        
+        $dato = $this->modelo->mostrar("gen.gen_contribuyente", $condicion . " ORDER BY id DESC");
         require_once(__DIR__ . "/../views/contribuyente/contribuyente.php");
     }
+
 
     // Mostrar formulario para nuevo contribuyente
     public function nuevo() {

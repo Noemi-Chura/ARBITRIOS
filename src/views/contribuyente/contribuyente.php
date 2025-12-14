@@ -6,6 +6,7 @@
   <table border="1" cellpadding="8" cellspacing="0" style="width:100%; text-align:left;">
     <thead style="background:#eee;">
       <tr>
+        <th>Acción</th>
         <th>ID</th>
         <th>ESTADO</th>
         <th>FECHA CREACION</th>
@@ -24,7 +25,6 @@
         <th>HORA CONTROL</th>
         <th>FECHA SERVIDOR</th>
         <th>Estado</th>
-        <th>Acción</th>
       </tr>
     </thead>
 
@@ -32,6 +32,11 @@
       <?php if (!empty($dato)): ?>
         <?php foreach ($dato as $row): ?>
           <tr>
+            <td>
+              <a class="btn" href="index.php?c=contribuyente&m=editar&id=<?= urlencode($row['id']) ?>">Editar</a>
+              <a class="btn" href="index.php?c=contribuyente&m=eliminar&id=<?= urlencode($row['id']) ?>" onclick="return confirm('¿Eliminar este contribuyente?');">Eliminar</a>
+              <a class="btn" href="index.php?c=arbitrios&m=index&id=<?= urlencode($row['id']) ?>">Arbitrios</a>
+            </td>
             <td><?= htmlspecialchars($row["id"] ?? "") ?></td>
             <td><?= htmlspecialchars($row["estado"] ?? "") ?></td>
             <td><?= htmlspecialchars($row["fecha_creacion"] ?? "") ?></td>
@@ -50,11 +55,6 @@
             <td><?= htmlspecialchars($row["h_control"] ?? "") ?></td>
             <td><?= htmlspecialchars($row["fecha_servidor"] ?? "") ?></td>
             <td><?= htmlspecialchars($row["estado"] ?? "") ?></td>
-            <td>
-              <a class="btn" href="index.php?c=contribuyente&m=editar&id=<?= urlencode($row['id']) ?>">Editar</a>
-              <a class="btn" href="index.php?c=contribuyente&m=eliminar&id=<?= urlencode($row['id']) ?>" onclick="return confirm('¿Eliminar este contribuyente?');">Eliminar</a>
-              <a class="btn" href="index.php?c=arbitrios&m=index&id=<?= urlencode($row['id']) ?>">Arbitrios</a>
-            </td>
           </tr>
         <?php endforeach; ?>
       <?php else: ?>
