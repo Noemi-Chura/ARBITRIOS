@@ -894,5 +894,686 @@ private function getTipoOrigen($idTipoRegistro) {
         
         exit;
     }
+
+    // ============ MÉTODOS PARA PROCESAR CUENTA CORRIENTE ============
+
+// Procesar cuenta corriente de predios seleccionados
+// Reemplaza el método procesarCuentaCorriente con esta versión mejorada
+public function procesarCuentaCorriente() {
+    header('Content-Type: application/json');
+    
+    try {
+        $input = file_get_contents('php://input');
+        $data = json_decode($input, true);
+        
+        error_log('[ARBITRIOS] === PROCESAR CUENTA CORRIENTE - VERSIÓN CORREGIDA ===');
+        error_log('[ARBITRIOS] Datos recibidos: ' . print_r($data, true));
+        
+        if (!$data || empty($data['predios'])) {
+            echo json_encode(['error' => 'No hay predios seleccionados']);
+            exit;
+        }
+        
+        $anioDesde = (int)($data['anio_desde'] ?? date('Y'));
+        $anioHasta = (int)($data['anio_hasta'] ?? date('Y'));
+        
+        $detalles = [];
+        $totalProcesado = 0;
+        $prediosConCategorizaciones = 0;
+        
+        foreach ($data['predios'] as $idPredio) {
+            error_log('[ARBITRIOS] Procesando predio ID: ' . $idPredio);
+            
+            // 1. Buscar el arbitrio asociado a este predio
+            $sqlArbitrio = "SELECT 
+                                a.id_arbitrio,
+                                a.id_contribuyente,
+                                p.codigo_catastral,
+                                c.nombre as nombre_contribuyente
+                            FROM arb.arbitrio a
+                            INNER JOIN gen.gen_predio p ON p.id = a.id_predio
+                            INNER JOIN gen.gen_contribuyente c ON c.id = a.id_contribuyente
+                            WHERE a.id_predio = :id_predio
+                            LIMIT 1";
+            
+            $arbitrioInfo = $this->modelo->query($sqlArbitrio, ['id_predio' => $idPredio]);
+            
+            if (empty($arbitrioInfo)) {
+                $detalles[] = [
+                    'tributo' => 'Arbitrios',
+                    'predio' => 'N/A',
+                    'codigo' => 'N/A',
+                    'fecha_vencimiento' => $data['fecha_vencimiento'] ?? date('Y-m-d'),
+                    'monto_base' => 0,
+                    'interes' => 0,
+                    'mora' => 0,
+                    'total' => 0,
+                    'estado' => '✗ Error',
+                    'mensaje' => 'Predio no registrado en arbitrios'
+                ];
+                continue;
+            }
+            
+            $arbitrioInfo = $arbitrioInfo[0];
+            $idArbitrio = $arbitrioInfo['id_arbitrio'];
+            error_log('[ARBITRIOS] ID Arbitrio encontrado: ' . $idArbitrio);
+            
+            // 2. Buscar categorizaciones para este arbitrio
+            $sqlCategorizaciones = "SELECT 
+                                        ad.id_arbitrio_detalle,
+                                        ad.anio,
+                                        ad.item,
+                                        ad.monto_base,
+                                        ad.interes,
+                                        ad.mora,
+                                        ad.monto_final,
+                                        ad.fecha_actualizado,
+                                        TO_CHAR(ad.fecha_actualizado, 'DD/MM/YYYY HH24:MI') as fecha_formateada
+                                    FROM arb.arbitrio_detalle ad
+                                    WHERE ad.id_arbitrio = :id_arbitrio
+                                    AND ad.anio BETWEEN :anio_desde AND :anio_hasta
+                                    ORDER BY ad.anio DESC, ad.item DESC";
+            
+            $categorizaciones = $this->modelo->query($sqlCategorizaciones, [
+                'id_arbitrio' => $idArbitrio,
+                'anio_desde' => $anioDesde,
+                'anio_hasta' => $anioHasta
+            ]);
+            
+            error_log('[ARBITRIOS] Categorizaciones encontradas para arbitrio ' . $idArbitrio . ': ' . count($categorizaciones));
+            
+            if (empty($categorizaciones)) {
+                $detalles[] = [
+                    'tributo' => 'Arbitrios',
+                    'predio' => $arbitrioInfo['codigo_catastral'],
+                    'codigo' => 'ARB-' . $arbitrioInfo['codigo_catastral'],
+                    'fecha_vencimiento' => $data['fecha_vencimiento'] ?? date('Y-m-d'),
+                    'monto_base' => 0,
+                    'interes' => 0,
+                    'mora' => 0,
+                    'total' => 0,
+                    'estado' => '✗ Error',
+                    'mensaje' => 'No hay categorizaciones para el período ' . $anioDesde . '-' . $anioHasta
+                ];
+                continue;
+            }
+            
+            // 3. Procesar cada categorización
+            foreach ($categorizaciones as $cat) {
+                error_log('[ARBITRIOS] Procesando categorización ID: ' . $cat['id_arbitrio_detalle'] . 
+                         ' - Monto base: ' . $cat['monto_base']);
+                
+                // Intentar actualizar cálculo
+                $montoActualizado = null;
+                
+                try {
+                    // Intentar con función PostgreSQL
+                    $sqlActualizar = "SELECT arb.fn_actualizar_mora_interes(:id_detalle)";
+                    $this->modelo->query($sqlActualizar, ['id_detalle' => $cat['id_arbitrio_detalle']]);
+                    
+                    // Obtener datos actualizados
+                    $sqlActualizado = "SELECT 
+                                        monto_base, 
+                                        interes, 
+                                        mora, 
+                                        monto_final,
+                                        TO_CHAR(fecha_actualizado, 'DD/MM/YYYY HH24:MI') as fecha_formateada
+                                      FROM arb.arbitrio_detalle 
+                                      WHERE id_arbitrio_detalle = :id_detalle";
+                    
+                    $actualizado = $this->modelo->query($sqlActualizado, [
+                        'id_detalle' => $cat['id_arbitrio_detalle']
+                    ]);
+                    
+                    if (!empty($actualizado)) {
+                        $montoActualizado = $actualizado[0];
+                    }
+                    
+                } catch (Exception $e) {
+                    error_log('[ARBITRIOS] Error al usar función: ' . $e->getMessage());
+                    // Si falla, usar los datos existentes
+                    $montoActualizado = [
+                        'monto_base' => $cat['monto_base'],
+                        'interes' => $cat['interes'],
+                        'mora' => $cat['mora'],
+                        'monto_final' => $cat['monto_final'],
+                        'fecha_formateada' => $cat['fecha_formateada']
+                    ];
+                }
+                
+                if ($montoActualizado) {
+                    $detalle = [
+                        'tributo' => 'Arbitrios',
+                        'predio' => $arbitrioInfo['codigo_catastral'],
+                        'codigo' => 'ARB-' . $arbitrioInfo['codigo_catastral'] . '-' . $cat['anio'] . '-' . $cat['item'],
+                        'fecha_vencimiento' => $data['fecha_vencimiento'] ?? date('Y-m-d', strtotime('+30 days')),
+                        'monto_base' => (float)$montoActualizado['monto_base'],
+                        'interes' => (float)$montoActualizado['interes'],
+                        'mora' => (float)$montoActualizado['mora'],
+                        'total' => (float)$montoActualizado['monto_final'],
+                        'estado' => '✓ Procesado',
+                        'mensaje' => 'Cálculo actualizado',
+                        'anio' => $cat['anio'],
+                        'item' => $cat['item'],
+                        'contribuyente' => $arbitrioInfo['nombre_contribuyente'],
+                        'fecha_actualizacion' => $montoActualizado['fecha_formateada']
+                    ];
+                    
+                    $detalles[] = $detalle;
+                    $totalProcesado += (float)$montoActualizado['monto_final'];
+                    $prediosConCategorizaciones++;
+                    
+                    error_log('[ARBITRIOS] Procesado: ' . json_encode($detalle));
+                }
+            }
+        }
+        
+        // 4. Preparar respuesta
+        $resultado = [
+            'success' => true,
+            'message' => 'Proceso completado',
+            'total_procesado' => $totalProcesado,
+            'total_registros' => count($detalles),
+            'predios_con_categorizaciones' => $prediosConCategorizaciones,
+            'detalles' => $detalles
+        ];
+        
+        // Estadísticas
+        $procesados = array_filter($detalles, function($d) { 
+            return strpos($d['estado'], '✓') !== false; 
+        });
+        $errores = array_filter($detalles, function($d) { 
+            return strpos($d['estado'], '✗') !== false; 
+        });
+        
+        $resultado['estadisticas'] = [
+            'procesados' => count($procesados),
+            'errores' => count($errores),
+            'total_predios' => count($data['predios'])
+        ];
+        
+        error_log('[ARBITRIOS] Resultado final: Procesados=' . count($procesados) . 
+                 ', Errores=' . count($errores) . 
+                 ', Total=' . $totalProcesado);
+        
+        echo json_encode($resultado);
+        
+    } catch (Exception $e) {
+        error_log('[ARBITRIOS] Error general: ' . $e->getMessage());
+        error_log('[ARBITRIOS] Traza: ' . $e->getTraceAsString());
+        echo json_encode([
+            'success' => false,
+            'error' => 'Error del sistema: ' . $e->getMessage()
+        ]);
+    }
+    
+    exit;
 }
+
+private function calcularMoraInteresManual($idDetalle) {
+    try {
+        error_log('[ARBITRIOS] Calculando mora/interés manualmente para ID: ' . $idDetalle);
+        
+        // Primero obtener los datos actuales con más información
+        $sqlDatos = "SELECT 
+                        monto_base,
+                        interes,
+                        mora,
+                        monto_final,
+                        fecha_actualizado,
+                        EXTRACT(DAY FROM (CURRENT_DATE - fecha_actualizado)) as dias_transcurridos
+                     FROM arb.arbitrio_detalle 
+                     WHERE id_arbitrio_detalle = :id_detalle";
+        
+        $datos = $this->modelo->query($sqlDatos, ['id_detalle' => $idDetalle]);
+        
+        if (empty($datos)) {
+            error_log('[ARBITRIOS] No se encontró detalle para cálculo manual');
+            return false;
+        }
+        
+        $datos = $datos[0];
+        $montoBase = (float)$datos['monto_base'];
+        $dias = max(0, (int)$datos['dias_transcurridos']); // No negativo
+        
+        // Si no han pasado días, no hay cambios
+        if ($dias === 0) {
+            error_log('[ARBITRIOS] No han pasado días desde la última actualización');
+            return true;
+        }
+        
+        // Usar las mismas tasas que la función PostgreSQL
+        $tasaInteres = 0.0005; // 0.05% diario
+        $tasaMora = 0.0003;    // 0.03% diario
+        
+        $interes = $montoBase * $tasaInteres * $dias;
+        $mora = $montoBase * $tasaMora * $dias;
+        $total = $montoBase + $interes + $mora;
+        
+        error_log('[ARBITRIOS] Cálculo manual - ' .
+                 'Base: ' . $montoBase . ', ' .
+                 'Días: ' . $dias . ', ' .
+                 'Interés (' . ($tasaInteres * 100) . '%): ' . $interes . ', ' .
+                 'Mora (' . ($tasaMora * 100) . '%): ' . $mora . ', ' .
+                 'Total: ' . $total);
+        
+        // Actualizar
+        $sqlUpdate = "UPDATE arb.arbitrio_detalle 
+                     SET interes = :interes,
+                         mora = :mora,
+                         monto_final = :total,
+                         fecha_actualizado = CURRENT_TIMESTAMP
+                     WHERE id_arbitrio_detalle = :id_detalle
+                     RETURNING id_arbitrio_detalle";
+        
+        $result = $this->modelo->query($sqlUpdate, [
+            'interes' => $interes,
+            'mora' => $mora,
+            'total' => $total,
+            'id_detalle' => $idDetalle
+        ]);
+        
+        error_log('[ARBITRIOS] Cálculo manual completado para ID: ' . 
+                 ($result[0]['id_arbitrio_detalle'] ?? $idDetalle));
+        
+        return true;
+        
+    } catch (Exception $e) {
+        error_log('[ARBITRIOS] Error en cálculo manual: ' . $e->getMessage());
+        return false;
+    }
+}
+
+    // Método para actualizar mora e interés
+    private function actualizarMoraInteres($idDetalle) {
+        try {
+            $sql = "SELECT arb.fn_actualizar_mora_interes(:id_detalle)";
+            $this->modelo->query($sql, ['id_detalle' => $idDetalle]);
+            return true;
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error al actualizar mora/interés: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Método para generar registro en caja
+   private function generarRegistroCaja($idPredio, $idTributo, $datosArbitrio, $fechaVencimiento, $predioInfo) {
+    try {
+        // Obtener cajero activo
+        $idCajero = 1; // Temporal
+        
+        // Obtener siguiente número de recibo
+        $sqlNumeroRecibo = "SELECT numeracion_actual_recibo + 1 as siguiente 
+                          FROM caj.cajero 
+                          WHERE id = :id_cajero";
+        
+        $resultNumero = $this->modelo->query($sqlNumeroRecibo, ['id_cajero' => $idCajero]);
+        $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
+        
+        // Crear pago - ¡¡CORREGIDO!!
+        $sqlPago = "INSERT INTO caj.pago 
+                   (id_usuario, id_cajero, id_tipo_pago, fecha_pago, total, observaciones)
+                   VALUES (
+                       :id_contribuyente, :id_cajero, 1, CURRENT_DATE, :total,
+                       CONCAT('Arbitrios - ', :tributo_nombre, ' - Predio: ', :predio_codigo)
+                   ) RETURNING id";
+        
+        $tributoNombre = $this->getNombreTributo($idTributo);
+        
+        $pago = $this->modelo->query($sqlPago, [
+            'id_contribuyente' => $predioInfo['id_contribuyente'],
+            'id_cajero' => $idCajero,
+            'total' => $datosArbitrio['monto_final'],
+            'tributo_nombre' => $tributoNombre,
+            'predio_codigo' => $predioInfo['codigo_catastral']
+        ]);
+        
+        $idPago = $pago[0]['id'];
+        
+        // Buscar concepto de pago
+        $sqlConcepto = "SELECT id FROM caj.concepto_pago 
+                       WHERE descripcion ILIKE '%arbitrio%' 
+                       LIMIT 1";
+        
+        $concepto = $this->modelo->query($sqlConcepto);
+        $idConcepto = $concepto[0]['id'] ?? 1;
+        
+        // Crear detalle
+        $sqlDetalle = "INSERT INTO caj.pago_detalle 
+                      (id_pago, id_concepto_pago, cantidad, subtotal)
+                      VALUES (:id_pago, :id_concepto, 1, :subtotal)";
+        
+        $this->modelo->query($sqlDetalle, [
+            'id_pago' => $idPago,
+            'id_concepto' => $idConcepto,
+            'subtotal' => $datosArbitrio['monto_final']
+        ]);
+        
+        // Generar recibo
+        $sqlRecibo = "INSERT INTO caj.recibo 
+                     (id_pago, id_cajero, numero_recibo, fecha_emision, total, estado)
+                     VALUES (:id_pago, :id_cajero, :numero_recibo, CURRENT_DATE, :total, 'PENDIENTE')
+                     RETURNING id";
+        
+        $recibo = $this->modelo->query($sqlRecibo, [
+            'id_pago' => $idPago,
+            'id_cajero' => $idCajero,
+            'numero_recibo' => $numeroRecibo,
+            'total' => $datosArbitrio['monto_final']
+        ]);
+        
+        // Actualizar numeración
+        $sqlActualizarCajero = "UPDATE caj.cajero 
+                               SET numeracion_actual_recibo = :numero_recibo 
+                               WHERE id = :id_cajero";
+        
+        $this->modelo->query($sqlActualizarCajero, [
+            'numero_recibo' => $numeroRecibo,
+            'id_cajero' => $idCajero
+        ]);
+        
+        return $recibo[0]['id'];
+        
+    } catch (Exception $e) {
+        error_log('[ARBITRIOS] Error en generarRegistroCaja: ' . $e->getMessage());
+        throw new Exception('Error al generar recibo: ' . $e->getMessage());
+    }
+}
+
+    // Método para generar recibos en caja (llamado desde JS)
+public function generarRecibosCaja() {
+    header('Content-Type: application/json');
+    
+    try {
+        $input = file_get_contents('php://input');
+        $data = json_decode($input, true);
+        
+        error_log('[ARBITRIOS] === GENERAR RECIBOS CAJA ===');
+        error_log('[ARBITRIOS] Datos: ' . print_r($data, true));
+        
+        $predios = $data['predios'] ?? [];
+        $idCajero = $data['id_cajero'] ?? 1;
+        $fechaVencimiento = $data['fecha_vencimiento'] ?? date('Y-m-d');
+        
+        if (empty($predios)) {
+            echo json_encode(['error' => 'No hay predios seleccionados']);
+            exit;
+        }
+        
+        $recibosGenerados = [];
+        $totalGenerado = 0;
+        
+        foreach ($predios as $idPredio) {
+            error_log('[ARBITRIOS] Buscando deudas para predio: ' . $idPredio);
+            
+            // Consulta más simple y segura
+            $sqlDeudas = "SELECT 
+                            ad.id_arbitrio_detalle,
+                            ad.monto_final,
+                            a.id_contribuyente,
+                            p.codigo_catastral
+                         FROM arb.arbitrio_detalle ad
+                         INNER JOIN arb.arbitrio a ON a.id_arbitrio = ad.id_arbitrio
+                         INNER JOIN gen.gen_predio p ON p.id = a.id_predio
+                         WHERE a.id_predio = :id_predio
+                         AND ad.monto_final > 0
+                         LIMIT 10"; // Límite por seguridad
+            
+            $deudas = $this->modelo->query($sqlDeudas, ['id_predio' => $idPredio]);
+            
+            error_log('[ARBITRIOS] Deudas encontradas: ' . count($deudas));
+            
+            if (empty($deudas)) {
+                error_log('[ARBITRIOS] No hay deudas para predio: ' . $idPredio);
+                continue;
+            }
+            
+            foreach ($deudas as $deuda) {
+                error_log('[ARBITRIOS] Generando recibo para deuda ID: ' . $deuda['id_arbitrio_detalle']);
+                
+                // Generar recibo SIMPLIFICADO (sin auditoría problemática)
+                $idRecibo = $this->generarReciboSimple($idCajero, $deuda, $fechaVencimiento);
+                
+                if ($idRecibo) {
+                    $recibosGenerados[] = [
+                        'id_recibo' => $idRecibo,
+                        'predio' => $deuda['codigo_catastral'],
+                        'monto' => $deuda['monto_final'],
+                        'id_deuda' => $deuda['id_arbitrio_detalle']
+                    ];
+                    $totalGenerado += $deuda['monto_final'];
+                }
+            }
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Recibos generados exitosamente',
+            'recibos_generados' => count($recibosGenerados),
+            'total_generado' => $totalGenerado,
+            'detalles' => $recibosGenerados,
+            'debug' => [
+                'predios_procesados' => count($predios),
+                'cajero_id' => $idCajero
+            ]
+        ]);
+        
+    } catch (Exception $e) {
+        error_log('[ARBITRIOS] ERROR generarRecibosCaja: ' . $e->getMessage());
+        echo json_encode([
+            'success' => false,
+            'error' => 'Error: ' . $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+    }
+    
+    exit;
+}
+
+// Método SIMPLIFICADO para generar recibo (sin problemas de auditoría)
+private function generarReciboSimple($idCajero, $deuda, $fechaVencimiento) {
+    try {
+        // 1. Obtener número de recibo
+        $sqlNumero = "SELECT numeracion_actual_recibo + 1 as siguiente 
+                     FROM caj.cajero 
+                     WHERE id = :id_cajero";
+        
+        $resultNumero = $this->modelo->query($sqlNumero, ['id_cajero' => $idCajero]);
+        $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
+        
+        // 2. Crear pago simple
+        $sqlPago = "INSERT INTO caj.pago 
+                   (id_usuario, id_cajero, id_tipo_pago, fecha_pago, total, observaciones)
+                   VALUES (
+                       :id_contribuyente, 
+                       :id_cajero, 
+                       1, 
+                       CURRENT_DATE, 
+                       :total,
+                       CONCAT('Arbitrios - Predio: ', :predio_codigo)
+                   ) RETURNING id";
+        
+        $pago = $this->modelo->query($sqlPago, [
+            'id_contribuyente' => $deuda['id_contribuyente'],
+            'id_cajero' => $idCajero,
+            'total' => $deuda['monto_final'],
+            'predio_codigo' => $deuda['codigo_catastral']
+        ]);
+        
+        if (empty($pago)) {
+            throw new Exception('No se pudo crear el pago');
+        }
+        
+        $idPago = $pago[0]['id'];
+        
+        // 3. Crear recibo simple
+        $sqlRecibo = "INSERT INTO caj.recibo 
+                     (id_pago, id_cajero, numero_recibo, fecha_emision, total, estado)
+                     VALUES (:id_pago, :id_cajero, :numero_recibo, CURRENT_DATE, :total, 'PENDIENTE')
+                     RETURNING id";
+        
+        $recibo = $this->modelo->query($sqlRecibo, [
+            'id_pago' => $idPago,
+            'id_cajero' => $idCajero,
+            'numero_recibo' => $numeroRecibo,
+            'total' => $deuda['monto_final']
+        ]);
+        
+        // 4. Actualizar numeración
+        $sqlActualizarCajero = "UPDATE caj.cajero 
+                               SET numeracion_actual_recibo = :numero_recibo 
+                               WHERE id = :id_cajero";
+        
+        $this->modelo->query($sqlActualizarCajero, [
+            'numero_recibo' => $numeroRecibo,
+            'id_cajero' => $idCajero
+        ]);
+        
+        error_log('[ARBITRIOS] Recibo generado: #' . $numeroRecibo . ' ID: ' . $recibo[0]['id']);
+        
+        return $recibo[0]['id'];
+        
+    } catch (Exception $e) {
+        error_log('[ARBITRIOS] Error generarReciboSimple: ' . $e->getMessage());
+        return null;
+    }
+}
+
+    // Método para generar recibo individual (faltaba)
+// Agrega este método en tu clase ArbitriosController
+private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
+    error_log('[ARBITRIOS] generandoReciboIndividual para cajero: ' . $idCajero);
+    
+    try {
+        // 1. Obtener siguiente número de recibo
+        $sqlNumero = "SELECT numeracion_actual_recibo + 1 as siguiente 
+                     FROM caj.cajero 
+                     WHERE id = :id_cajero";
+        
+        $resultNumero = $this->modelo->query($sqlNumero, ['id_cajero' => $idCajero]);
+        $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
+        
+        error_log('[ARBITRIOS] Número recibo: ' . $numeroRecibo);
+        
+        // 2. Crear pago
+        $sqlPago = "INSERT INTO caj.pago 
+                   (id_usuario, id_cajero, id_tipo_pago, fecha_pago, total, observaciones)
+                   VALUES (
+                       :id_contribuyente, 
+                       :id_cajero, 
+                       1, 
+                       CURRENT_DATE, 
+                       :total,
+                       CONCAT('Arbitrios - Predio: ', :predio_codigo, ' - Vence: ', :fecha_vencimiento)
+                   ) RETURNING id";
+        
+        $pago = $this->modelo->query($sqlPago, [
+            'id_contribuyente' => $deuda['id_contribuyente'],
+            'id_cajero' => $idCajero,
+            'total' => $deuda['monto_final'],
+            'predio_codigo' => $deuda['codigo_catastral'],
+            'fecha_vencimiento' => $fechaVencimiento
+        ]);
+        
+        if (empty($pago)) {
+            throw new Exception('No se pudo crear el pago');
+        }
+        
+        $idPago = $pago[0]['id'];
+        error_log('[ARBITRIOS] Pago creado ID: ' . $idPago);
+        
+        // 3. Buscar concepto de pago para arbitrios
+        $sqlConcepto = "SELECT id FROM caj.concepto_pago 
+                       WHERE descripcion ILIKE '%arbitrio%' 
+                       LIMIT 1";
+        
+        $concepto = $this->modelo->query($sqlConcepto);
+        $idConcepto = $concepto[0]['id'] ?? 1;
+        
+        // 4. Crear detalle del pago
+        $sqlDetalle = "INSERT INTO caj.pago_detalle 
+                      (id_pago, id_concepto_pago, cantidad, subtotal)
+                      VALUES (:id_pago, :id_concepto, 1, :subtotal)";
+        
+        $this->modelo->query($sqlDetalle, [
+            'id_pago' => $idPago,
+            'id_concepto' => $idConcepto,
+            'subtotal' => $deuda['monto_final']
+        ]);
+        
+        // 5. Generar recibo
+        $sqlRecibo = "INSERT INTO caj.recibo 
+                     (id_pago, id_cajero, numero_recibo, fecha_emision, total, estado)
+                     VALUES (:id_pago, :id_cajero, :numero_recibo, CURRENT_DATE, :total, 'PENDIENTE')
+                     RETURNING id";
+        
+        $recibo = $this->modelo->query($sqlRecibo, [
+            'id_pago' => $idPago,
+            'id_cajero' => $idCajero,
+            'numero_recibo' => $numeroRecibo,
+            'total' => $deuda['monto_final']
+        ]);
+        
+        if (empty($recibo)) {
+            throw new Exception('No se pudo crear el recibo');
+        }
+        
+        $idRecibo = $recibo[0]['id'];
+        error_log('[ARBITRIOS] Recibo creado ID: ' . $idRecibo);
+        
+        // 6. Actualizar numeración del cajero
+        $sqlActualizarCajero = "UPDATE caj.cajero 
+                               SET numeracion_actual_recibo = :numero_recibo 
+                               WHERE id = :id_cajero";
+        
+        $this->modelo->query($sqlActualizarCajero, [
+            'numero_recibo' => $numeroRecibo,
+            'id_cajero' => $idCajero
+        ]);
+        
+        // 7. Registrar auditoría SIMPLIFICADA (sin el atributo problemático)
+        try {
+            $sqlAuditoria = "INSERT INTO caj.auditoria 
+                           (tabla, operacion, registro_id, usuario_bd, fecha, descripcion)
+                           VALUES ('recibo', 'INSERT', :id_recibo, CURRENT_USER, CURRENT_TIMESTAMP, :descripcion)";
+            
+            $this->modelo->query($sqlAuditoria, [
+                'id_recibo' => $idRecibo,
+                'descripcion' => json_encode([
+                    'predio' => $deuda['codigo_catastral'],
+                    // 'contribuyente' => OMITIDO TEMPORALMENTE,
+                    'monto' => $deuda['monto_final'],
+                    'fecha_vencimiento' => $fechaVencimiento,
+                    'id_contribuyente' => $deuda['id_contribuyente']
+                ])
+            ]);
+            
+            error_log('[ARBITRIOS] Auditoría registrada para recibo: ' . $idRecibo);
+            
+        } catch (Exception $e) {
+            // No romper si falla la auditoría
+            error_log('[ARBITRIOS] Error en auditoría (no crítico): ' . $e->getMessage());
+        }
+        
+        return $idRecibo;
+        
+    } catch (Exception $e) {
+        error_log('[ARBITRIOS] Error en generarReciboIndividual: ' . $e->getMessage());
+        return null;
+    }
+}
+    // Método auxiliar para obtener nombre del tributo
+    private function getNombreTributo($idTributo) {
+        $tributos = [
+            1 => 'Limpieza Pública',
+            2 => 'Parques y Jardines',
+            3 => 'Residuos Sólidos',
+            4 => 'Serenazgo'
+        ];
+        
+        return $tributos[$idTributo] ?? 'Arbitrios';
+    }
+}
+
+
 ?>

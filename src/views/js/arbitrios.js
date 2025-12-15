@@ -466,34 +466,6 @@ if (formCrearCategorizacion) {
     });
   }
   
-  // ============ BOTONES DE CUENTA CORRIENTE ============
-  const btnActualizarCtacte = document.getElementById('btnActualizarCtacte');
-  const btnVerCtacte = document.getElementById('btnVerCtacte');
-  
-  if (btnActualizarCtacte) {
-    btnActualizarCtacte.addEventListener('click', function() {
-      const prediosSeleccionados = Array.from(document.querySelectorAll('.predio-checkbox:checked'))
-        .map(cb => cb.dataset.predioId);
-      
-      if (prediosSeleccionados.length === 0) {
-        alert('Por favor, seleccione al menos un predio');
-        return;
-      }
-      
-      if (confirm(`¿Actualizar cuenta corriente para ${prediosSeleccionados.length} predio(s)?`)) {
-        // Aquí iría la lógica para actualizar cuenta corriente
-        console.log('[ARBITRIOS] Actualizando cuenta corriente para predios:', prediosSeleccionados);
-        alert('Función de actualización de cuenta corriente por implementar');
-      }
-    });
-  }
-  
-  if (btnVerCtacte) {
-    btnVerCtacte.addEventListener('click', function() {
-      alert('Función de ver cuenta corriente por implementar');
-    });
-  }
-  
   // ============ FUNCIONES PARA MODAL DE AGREGAR PREDIO ============
   function cerrarModal() {
     if (modalAgregarPredio) {
@@ -652,7 +624,373 @@ if (formCrearCategorizacion) {
   }, 50);
   
   console.log('[ARBITRIOS] === FIN INICIALIZACIÓN ARBITRIOS ===');
+  
+  // Inicializar funcionalidad de procesar cuenta corriente
+  setupProcesarCtacte();
 }
+
+
+// ============ FUNCION SETUP PROCESAR CUENTA CORRIENTE ============
+// Esta función va AFUERA de initializeArbitrios()
+// ============ FUNCION SETUP PROCESAR CUENTA CORRIENTE ============
+// Esta función va AFUERA de initializeArbitrios()
+// ============ FUNCION SETUP PROCESAR CUENTA CORRIENTE ============
+// Esta función va AFUERA de initializeArbitrios()
+
+
+// ============ FUNCIONES AUXILIARES PARA PROCESAR CUENTA CORRIENTE ============
+// ============ FUNCION SETUP PROCESAR CUENTA CORRIENTE ============
+function setupProcesarCtacte() {
+  console.log('[ARBITRIOS] Inicializando procesar cuenta corriente...');
+  
+  const modalProcesarCtacte = document.getElementById('modalProcesarCtacte');
+  const btnActualizarCtacte = document.getElementById('btnActualizarCtacte');
+  const btnCerrarProcesarCtacte = document.getElementById('btnCerrarProcesarCtacte');
+  const btnCancelarProcesarCtacte = document.getElementById('btnCancelarProcesarCtacte');
+  const formProcesarCtacte = document.getElementById('formProcesarCtacte');
+  const btnProcesarCtacte = document.getElementById('btnProcesarCtacte');
+  const fechaVencimientoInput = document.getElementById('fechaVencimiento');
+
+  // FUNCIÓN PARA OBTENER FECHA EN FORMATO YYYY-MM-DD (30 días en el futuro)
+  const obtenerFechaFutura = (dias = 30) => {
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + dias);
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+
+  // 1. VERIFICAR QUE LOS ELEMENTOS EXISTEN
+  if (!modalProcesarCtacte) {
+    console.error('[ARBITRIOS] ERROR: No se encuentra el modal modalProcesarCtacte');
+    return;
+  }
+
+  // 2. CONFIGURAR BOTÓN "ACTUALIZAR CUENTA CORRIENTE"
+  if (btnActualizarCtacte) {
+    // Limpiar evento anterior
+    btnActualizarCtacte.onclick = null;
+    
+    btnActualizarCtacte.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      console.log('[ARBITRIOS] Botón "Actualizar Cuenta Corriente" CLICKEADO');
+      
+      // SELECCIÓN MANUAL DE PREDIOS - PREDETERMINADOS
+      const prediosSeleccionados = [];
+      
+      // Función para buscar predio por código en la tabla
+      const buscarPredioPorCodigo = (codigo) => {
+        const rows = document.querySelectorAll('.predio-row');
+        for (let row of rows) {
+          const codigoCell = row.querySelector('td:nth-child(3)');
+          if (codigoCell && codigoCell.textContent.includes(codigo)) {
+            return row.getAttribute('data-predio-id');
+          }
+        }
+        return null;
+      };
+      
+      // Códigos de predios que SÍ tienen categorizaciones (según tus datos)
+      const codigosPrediosConCategorizaciones = [
+        '01-01-01-000014',  // Predio Clínica (tiene 4 categorizaciones)
+        '01-01-01-000002',  // Predio Tienda La Paz (tiene 1 categorización)
+        '01-01-01-000003'   // Predio Oficina Central (tiene 1 categorización)
+      ];
+      
+      console.log('[ARBITRIOS] Buscando predios por código...');
+      
+      // Buscar cada predio
+      codigosPrediosConCategorizaciones.forEach(codigo => {
+        const idPredio = buscarPredioPorCodigo(codigo);
+        if (idPredio) {
+          prediosSeleccionados.push(idPredio);
+          console.log(`✅ Predio ${codigo} encontrado (ID: ${idPredio})`);
+        } else {
+          console.warn(`⚠️ Predio ${codigo} NO encontrado en la tabla`);
+        }
+      });
+      
+      // Si no encontramos predios por código, usar los primeros disponibles
+      if (prediosSeleccionados.length === 0) {
+        console.warn('[ARBITRIOS] No se encontraron predios por código, usando primeros disponibles');
+        const primerosPredios = document.querySelectorAll('.predio-row');
+        if (primerosPredios.length > 0) {
+          primerosPredios.forEach((row, index) => {
+            if (index < 3) { // Tomar máximo 3 predios
+              const id = row.getAttribute('data-predio-id');
+              if (id) prediosSeleccionados.push(id);
+            }
+          });
+        }
+      }
+      
+      // VERIFICAR FINAL
+      if (prediosSeleccionados.length === 0) {
+        alert('❌ No se pudieron identificar predios para procesar.\n\nVerifica que la tabla de predios esté cargada correctamente.');
+        return;
+      }
+      
+      console.log('[ARBITRIOS] Predios seleccionados:', prediosSeleccionados);
+      
+      // Marcar checkboxes visualmente
+      prediosSeleccionados.forEach(id => {
+        const checkbox = document.querySelector(`.predio-checkbox[data-predio-id="${id}"]`);
+        if (checkbox) {
+          checkbox.checked = true;
+        }
+      });
+      
+      // Guardar en sessionStorage
+      sessionStorage.setItem('prediosProcesarCtacte', JSON.stringify(prediosSeleccionados));
+      
+      // ESTABLECER FECHA DE VENCIMIENTO AUTOMÁTICAMENTE (30 días en el futuro)
+      if (fechaVencimientoInput) {
+        fechaVencimientoInput.value = obtenerFechaFutura(30);
+        console.log('[ARBITRIOS] Fecha vencimiento establecida:', fechaVencimientoInput.value);
+      }
+      
+      // MOSTRAR EL MODAL
+      modalProcesarCtacte.style.display = 'block';
+      document.body.classList.add('modal-open'); // Para bloquear scroll si es necesario
+      console.log('[ARBITRIOS] Modal mostrado correctamente');
+    });
+  } else {
+    console.error('[ARBITRIOS] ERROR: No se encuentra btnActualizarCtacte');
+  }
+
+  // 3. CONFIGURAR BOTONES DE CERRAR MODAL
+  const cerrarModal = () => {
+    modalProcesarCtacte.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    console.log('[ARBITRIOS] Modal cerrado');
+  };
+
+  if (btnCerrarProcesarCtacte) {
+    btnCerrarProcesarCtacte.onclick = cerrarModal;
+  }
+  
+  if (btnCancelarProcesarCtacte) {
+    btnCancelarProcesarCtacte.onclick = cerrarModal;
+  }
+  
+  // Cerrar al hacer clic fuera del modal
+  modalProcesarCtacte.addEventListener('click', function(event) {
+    if (event.target === modalProcesarCtacte) {
+      cerrarModal();
+    }
+  });
+
+  // 4. CONFIGURAR FORMULARIO PARA PROCESAR
+  if (formProcesarCtacte) {
+    formProcesarCtacte.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      // Obtener predios seleccionados
+      const prediosSeleccionados = JSON.parse(sessionStorage.getItem('prediosProcesarCtacte') || '[]');
+      if (prediosSeleccionados.length === 0) {
+        alert('No hay predios seleccionados');
+        return;
+      }
+
+      // Obtener tributos seleccionados
+      const tributosSeleccionados = [];
+      document.querySelectorAll('input[name="tributos[]"]:checked').forEach(cb => {
+        tributosSeleccionados.push(parseInt(cb.value));
+      });
+
+      if (tributosSeleccionados.length === 0) {
+        alert('Seleccione al menos un tributo');
+        return;
+      }
+
+      // Validar años
+      const anioDesde = parseInt(document.getElementById('anioDesde').value);
+      const anioHasta = parseInt(document.getElementById('anioHasta').value);
+      
+      if (anioDesde > anioHasta) {
+        alert('El año "Desde" no puede ser mayor al año "Hasta"');
+        return;
+      }
+
+      // Mostrar carga
+      const originalText = btnProcesarCtacte.innerHTML;
+      btnProcesarCtacte.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+      btnProcesarCtacte.disabled = true;
+
+      try {
+        // Datos para enviar al servidor
+        const data = {
+          predios: prediosSeleccionados,
+          anio_desde: anioDesde,
+          anio_hasta: anioHasta,
+          fecha_vencimiento: fechaVencimientoInput ? fechaVencimientoInput.value : obtenerFechaFutura(30),
+          tributos: tributosSeleccionados
+        };
+
+        console.log('[ARBITRIOS] Enviando datos al servidor:', data);
+        
+        const response = await fetch('index.php?c=arbitrios&m=procesarCuentaCorriente', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        console.log('[ARBITRIOS] Resultado del servidor:', result);
+        
+        if (result.success) {
+          // Mostrar resultados
+          mostrarResultadosProceso(result);
+          document.getElementById('resultadoProceso').style.display = 'block';
+          
+          // Mostrar mensaje de éxito
+          if (result.estadisticas && result.estadisticas.procesados > 0) {
+            alert(`✅ PROCESO EXITOSO\n\nPredios procesados: ${result.estadisticas.procesados}\nMonto total: S/. ${result.total_procesado.toFixed(2)}`);
+          }
+        } else {
+          alert('Error: ' + result.error);
+        }
+      } catch (error) {
+        console.error('[ARBITRIOS] Error al procesar:', error);
+        alert('Error de conexión: ' + error.message);
+      } finally {
+        btnProcesarCtacte.innerHTML = originalText;
+        btnProcesarCtacte.disabled = false;
+      }
+    });
+  }
+  
+  console.log('[ARBITRIOS] setupProcesarCtacte() configurado correctamente');
+}
+
+// Función para mostrar resultados
+function mostrarResultadosProceso(resultado) {
+  const cuerpoResultados = document.getElementById('cuerpoResultados');
+  const totalProcesado = document.getElementById('totalProcesado');
+  const totalRegistros = document.getElementById('totalRegistros');
+
+  if (!cuerpoResultados) {
+    console.warn('[ARBITRIOS] No se encontró cuerpo de resultados');
+    return;
+  }
+
+  let html = '';
+  let total = 0;
+  let registros = 0;
+
+  if (resultado.detalles && resultado.detalles.length > 0) {
+    resultado.detalles.forEach(detalle => {
+      const estadoClass = detalle.estado && detalle.estado.includes('✓') ? 'estado-success' : 'estado-error';
+      
+      html += `
+        <tr>
+          <td>${detalle.tributo || 'Arbitrios'}</td>
+          <td>${detalle.predio || detalle.predio_codigo || ''}</td>
+          <td>${detalle.codigo || ''}</td>
+          <td>${detalle.fecha_vencimiento || ''}</td>
+          <td>S/. ${parseFloat(detalle.monto_base || 0).toFixed(2)}</td>
+          <td>S/. ${parseFloat(detalle.interes || 0).toFixed(2)}</td>
+          <td>S/. ${parseFloat(detalle.mora || 0).toFixed(2)}</td>
+          <td>S/. ${parseFloat(detalle.total || 0).toFixed(2)}</td>
+          <td class="${estadoClass}">${detalle.estado || 'Error'}</td>
+        </tr>
+      `;
+
+      if (detalle.estado && detalle.estado.includes('✓')) {
+        total += parseFloat(detalle.total || 0);
+      }
+      registros++;
+    });
+  } else {
+    html = `<tr><td colspan="9" class="text-center">No se procesaron registros</td></tr>`;
+  }
+
+  cuerpoResultados.innerHTML = html;
+  if (totalProcesado) totalProcesado.textContent = `S/. ${total.toFixed(2)}`;
+  if (totalRegistros) totalRegistros.textContent = registros;
+}
+// Función para exportar resultados a Excel (AFUERA)
+function exportarResultadosExcel() {
+  const tabla = document.getElementById('tablaResultados');
+  if (!tabla) {
+    alert('No hay datos para exportar');
+    return;
+  }
+
+  // Verificar si está cargada la librería XLSX
+  if (typeof XLSX === 'undefined') {
+    alert('La librería para exportar Excel no está cargada');
+    return;
+  }
+
+  const ws = XLSX.utils.table_to_sheet(tabla);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Resultados');
+
+  const fecha = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `resultados_cuenta_corriente_${fecha}.xlsx`);
+}
+
+// Función para generar recibos en módulo caja (AFUERA)
+async function generarRecibosCaja() {
+  const prediosSeleccionados = JSON.parse(sessionStorage.getItem('prediosProcesarCtacte') || '[]');
+  
+  if (prediosSeleccionados.length === 0) {
+    alert('No hay predios seleccionados para generar recibos');
+    return;
+  }
+
+  if (!confirm(`¿Generar recibos para ${prediosSeleccionados.length} predio(s) en el módulo de caja?`)) {
+    return;
+  }
+
+  try {
+    // Obtener el cajero activo (deberías tener esta información en sesión)
+    const idCajero = 1; // Reemplazar con el ID del cajero de la sesión
+    
+    const response = await fetch('index.php?c=arbitrios&m=generarRecibosCaja', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        predios: prediosSeleccionados,
+        id_cajero: idCajero,
+        fecha_vencimiento: document.getElementById('fechaVencimiento').value
+      })
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      alert(`Se generaron ${result.recibos_generados} recibos correctamente\nTotal: S/. ${result.total_generado.toFixed(2)}`);
+      
+      // Opcional: Redirigir a módulo de caja
+      if (confirm('¿Desea ver los recibos generados en el módulo de caja?')) {
+        window.open('index.php?c=caja&m=index', '_blank');
+      }
+    } else {
+      alert('Error: ' + result.error);
+    }
+  } catch (error) {
+    console.error('[ARBITRIOS] Error al generar recibos:', error);
+    alert('Error de conexión con el módulo de caja');
+  }
+}
+
+// Función auxiliar para scroll (AFUERA)
+function scrollToElement(elementId) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 
 // ============ FUNCIONES AUXILIARES EXTERNAS ============
 

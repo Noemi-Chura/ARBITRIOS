@@ -496,6 +496,124 @@
   </div>
 </div>
 
+<!-- MODAL PARA PROCESAR CUENTA CORRIENTE -->
+<div id="modalProcesarCtacte" class="arb-modal" style="display: none;">
+  <div class="arb-modal-content arb-modal-medium">
+    <div class="arb-modal-header">
+      <h2><i class="fas fa-calculator"></i> Procesar Cuenta Tributaria</h2>
+      <button class="arb-modal-close" id="btnCerrarProcesarCtacte">&times;</button>
+    </div>
+    <div class="arb-modal-body">
+      <form id="formProcesarCtacte">
+        <div class="form-group">
+          <label>Tributo:</label>
+          <input type="text" value="Arbitrios" readonly class="readonly-input">
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="anioDesde">Desde Año *</label>
+            <input type="number" id="anioDesde" name="anio_desde" min="2020" max="2030" 
+                   value="2023" required>
+          </div>
+          <div class="form-group">
+            <label for="anioHasta">Hasta Año *</label>
+            <input type="number" id="anioHasta" name="anio_hasta" min="2020" max="2030" 
+                   value="2025" required>
+          </div>
+        </div>
+        
+        <div class="tributos-checkboxes">
+          <h4>Tributos a procesar:</h4>
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" name="tributos[]" value="1" checked>
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">Limpieza Pública</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="tributos[]" value="2" checked>
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">Parques y Jardines</span>
+            </label>
+          </div>
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" name="tributos[]" value="3" checked>
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">Residuos Sólidos</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="tributos[]" value="4" checked>
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">Serenazgo</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="fechaVencimiento">Fecha de Vencimiento *</label>
+          <input type="date" id="fechaVencimiento" name="fecha_vencimiento" 
+                 value="<?= date('Y-m-d', strtotime('+30 days')) ?>" required>
+        </div>
+        
+        <div class="form-buttons">
+          <button type="submit" class="btn-grabar" id="btnProcesarCtacte">
+            <i class="fas fa-calculator"></i> Procesar Cuenta Tributaria
+          </button>
+          <button type="button" class="btn-cancelar" id="btnCancelarProcesarCtacte">
+            <i class="fas fa-times"></i> Cancelar
+          </button>
+        </div>
+        
+        <!-- Resultados del proceso -->
+        <div id="resultadoProceso" style="display: none; margin-top: 30px;">
+          <h4><i class="fas fa-list-alt"></i> Resultado del Proceso</h4>
+          <div class="table-wrapper">
+            <table class="result-table" id="tablaResultados">
+              <thead>
+                <tr>
+                  <th>Tributo</th>
+                  <th>Predio</th>
+                  <th>Código</th>
+                  <th>F. Vencimiento</th>
+                  <th>Monto Base</th>
+                  <th>Interés</th>
+                  <th>Mora</th>
+                  <th>Total</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="cuerpoResultados">
+                <!-- Resultados se cargarán aquí -->
+              </tbody>
+            </table>
+          </div>
+          <div class="result-totals">
+            <div class="total-item">
+              <span>Total Procesado:</span>
+              <strong id="totalProcesado">S/. 0.00</strong>
+            </div>
+            <div class="total-item">
+              <span>Registros:</span>
+              <strong id="totalRegistros">0</strong>
+            </div>
+          </div>
+          <div class="result-actions">
+            <button type="button" class="btn-secondary" id="btnExportarResultados">
+              <i class="fas fa-file-excel"></i> Exportar a Excel
+            </button>
+            <button type="button" class="btn-primary" id="btnGenerarRecibos">
+              <i class="fas fa-print"></i> Generar Recibos
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
 <?php require_once(__DIR__ . "/../layout/footer.php"); ?>
 <script type="text/javascript">
 <?php 

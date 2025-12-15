@@ -293,8 +293,8 @@ INSERT INTO arb.arbitrio_detalle (
     id_exoneracion_limpieza_publica, id_exoneracion_parques_jardines, 
     id_exoneracion_relleno_sanitario, id_exoneracion_serenazgo
 ) VALUES (
-    6, 
-    20, 
+    7, 
+    23, 
     3, 10, 12, 17, 
     10.50, 5, 4, 120.00, 200.00, 1, -- tiene_licencia: 1
     0.00, 200.00, 200.00, 50.00, 
