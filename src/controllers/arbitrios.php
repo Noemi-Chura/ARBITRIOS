@@ -6,7 +6,7 @@ class ArbitriosController {
     private $modelo;
 
     public function __construct() {
-        $this->modelo = new Modelo();
+        $this->modelo = new Database();
     }
 
     public function index() {
@@ -22,7 +22,7 @@ class ArbitriosController {
             die('<main><h3>Error: contribuyente no encontrado.</h3></main>');
         }
 
-        // Consultar predios ya registrados en arbitrios para este contribuyente
+        
         $predios = $this->modelo->consultaPersonalizada(
             "SELECT DISTINCT p.id, p.estado, 
                     SUBSTRING(p.codigo_catastral, 10) as codigo_catastral,
@@ -43,22 +43,88 @@ class ArbitriosController {
         $referencias = $this->modelo->mostrar("arb.tipo_registro_origen");
         $estados = ['activo', 'anulado', 'Subdividido'];
         
-        // Obtener categorías para los tributos
-        $categorias_limpieza = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 1");
-        $categorias_parques = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 2");
-        $categorias_residuos = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 3");
-        $categorias_serenazgo = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 4");
         
-        // Obtener tributos
+        $categorias_limpieza = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 1 AND denominacion NOT LIKE '%xoner%' AND denominacion NOT LIKE '%fecto%'");
+        $categorias_parques = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 2 AND denominacion NOT LIKE '%xoner%' AND denominacion NOT LIKE '%fecto%'");
+        $categorias_residuos = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 3 AND denominacion NOT LIKE '%xoner%' AND denominacion NOT LIKE '%fecto%'");
+        $categorias_serenazgo = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 4 AND denominacion NOT LIKE '%xoner%' AND denominacion NOT LIKE '%fecto%'");
+        
+        
         $tributos = $this->modelo->mostrar("arb.tributo");
         
-        // Obtener tipos de exoneración
-        $exoneraciones = $this->modelo->mostrar("arb.tipo_beneficio", "abreviatura ILIKE '%exonerado%'");
+        
+        $exoneraciones_limpieza = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 1 AND (denominacion LIKE '%xoner%' OR denominacion LIKE '%fecto%')");
+        $exoneraciones_parques = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 2 AND (denominacion LIKE '%xoner%' OR denominacion LIKE '%fecto%')");
+        $exoneraciones_residuos = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 3 AND (denominacion LIKE '%xoner%' OR denominacion LIKE '%fecto%')");
+        $exoneraciones_serenazgo = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = 4 AND (denominacion LIKE '%xoner%' OR denominacion LIKE '%fecto%')");
         
         require_once(__DIR__ . "/../views/arbitrios/index.php");
     }
 
-    // En src/controllers/arbitrios.php, agrega este método:
+    
+
+        public function actualizarPredio() {
+            error_log("=== ACTUALIZAR PREDIO INICIADO ===");
+            
+            
+            $jsonData = file_get_contents('php://input');
+            $data = json_decode($jsonData, true);
+            
+            error_log("Datos recibidos: " . print_r($data, true));
+            
+            $idPredio = $data['id_predio'] ?? null;
+            $idContribuyente = $data['id_contribuyente'] ?? null;
+            $estado = $data['estado'] ?? null;
+            $idTipoRegistroOrigen = $data['id_tipo_registro_origen'] ?? null;
+            
+            if (!$idPredio || !$idContribuyente || !$estado || !$idTipoRegistroOrigen) {
+                error_log("ERROR: Faltan parámetros obligatorios");
+                echo json_encode(['success' => false, 'error' => 'Faltan parámetros obligatorios']);
+                exit;
+            }
+            
+            try {
+                error_log("Actualizando predio en arb.arbitrio...");
+                
+                
+                $sql = "UPDATE arb.arbitrio 
+                       SET estado = :estado,
+                           id_tipo_registro_origen = :id_tipo_registro_origen,
+                           fecha_actualizado = CURRENT_TIMESTAMP
+                       WHERE id_predio = :id_predio
+                       AND id_contribuyente = :id_contribuyente
+                       RETURNING id_arbitrio";
+                
+                $resultado = $this->modelo->query($sql, [
+                    'estado' => $estado,
+                    'id_tipo_registro_origen' => $idTipoRegistroOrigen,
+                    'id_predio' => $idPredio,
+                    'id_contribuyente' => $idContribuyente
+                ]);
+                
+                error_log("Resultado actualización: " . print_r($resultado, true));
+                
+                if (!empty($resultado)) {
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'Predio actualizado correctamente',
+                        'id_arbitrio' => $resultado[0]['id_arbitrio']
+                    ]);
+                } else {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'No se encontró el predio para actualizar'
+                    ]);
+                }
+                
+            } catch (Exception $e) {
+                error_log("EXCEPCIÓN: " . $e->getMessage());
+                error_log("Traza: " . $e->getTraceAsString());
+                echo json_encode(['success' => false, 'error' => 'Error al actualizar: ' . $e->getMessage()]);
+            }
+            
+            exit;
+        }
 
         public function eliminarPredio() {
             error_log("=== ELIMINAR PREDIO INICIADO ===");
@@ -78,7 +144,7 @@ class ArbitriosController {
             try {
                 error_log("Conectando a la base de datos...");
                 
-                // Primero verificar si existe
+                
                 $sqlCheck = "SELECT COUNT(*) as existe FROM arb.arbitrio 
                             WHERE id_predio = :id_predio
                             AND id_contribuyente = :id_contribuyente";
@@ -97,7 +163,7 @@ class ArbitriosController {
                     exit;
                 }
                 
-                // Primero eliminar los detalles de arbitrio (si existen)
+                
                 error_log("Eliminando detalles de arbitrio...");
                 $sqlDeleteDetalles = "DELETE FROM arb.arbitrio_detalle ad
                                     USING arb.arbitrio a 
@@ -112,7 +178,7 @@ class ArbitriosController {
                 
                 error_log("Detalles eliminados correctamente");
                 
-                // Luego eliminar el arbitrio
+                
                 error_log("Eliminando arbitrio...");
                 $sqlDeleteArbitrio = "DELETE FROM arb.arbitrio 
                                     WHERE id_predio = :id_predio
@@ -141,27 +207,22 @@ class ArbitriosController {
             exit;
         }
 
-    // ============ MÉTODOS PARA CATEGORIZACIÓN POR AÑOS ============
     
-    // Obtener categorizaciones por año para un predio
-// En el método getCategorizacionesPredio, modificar la consulta para usar 1/0
-// En el archivo arbitrios.php, dentro de la clase Arbitrios (o el nombre de tu clase)
+    
+    
 
-public function getCategorizacionesPredio() {
-    // 1. Obtener parámetros de la URL
-    $idPredio = $_GET['id_predio'] ?? null;
-    $idContribuyente = $_GET['id_contribuyente'] ?? null;
+    public function getCategorizacionesPredio() {
+        
+        $idPredio = $_GET['id_predio'] ?? null;
+        $idContribuyente = $_GET['id_contribuyente'] ?? null;
 
-    if (!$idPredio || !$idContribuyente) {
-        // Enviar un mensaje de error si faltan parámetros
-        echo json_encode(['success' => false, 'error' => 'Parámetros incompletos (id_predio o id_contribuyente)']);
-        exit;
-    }
+        if (!$idPredio || !$idContribuyente) {
+            
+            echo json_encode(['success' => false, 'error' => 'Parámetros incompletos (id_predio o id_contribuyente)']);
+            exit;
+        }
 
-    // 2. Definir la consulta SQL con múltiples LEFT JOINs
-    // Nota: Usamos '::int' para convertir el booleano de PostgreSQL (true/false) a entero (1/0)
-    // y COALESCE para manejar los valores NULL de las exoneraciones (asignando 'Afecto al arbitrio').
-    $sql = "
+        $sql = "
         SELECT
             ad.id_arbitrio_detalle,
             ad.anio,
@@ -214,55 +275,107 @@ public function getCategorizacionesPredio() {
             ad.anio DESC, ad.item DESC;
     ";
 
-    // 3. Ejecutar la consulta
-    try {
-        $params = [
-            ':id_predio' => $idPredio,
-            ':id_contribuyente' => $idContribuyente
-        ];
-        
-        // Asumiendo que $this->modelo->query ejecuta la consulta y devuelve un array de resultados
-        $data = $this->modelo->query($sql, $params);
+    
+        try {
+            $params = [
+                ':id_predio' => $idPredio,
+                ':id_contribuyente' => $idContribuyente
+            ];
+            
+            
+            $data = $this->modelo->query($sql, $params);
 
-        // Si se encontraron datos o si el array está vacío (pero la consulta fue exitosa)
-        echo json_encode(['success' => true, 'data' => $data]);
+            
+            echo json_encode(['success' => true, 'datos' => $data]);
 
-    } catch (Exception $e) {
-        // En caso de un error de conexión o sintaxis SQL
-        error_log('[ARBITRIOS] Error SQL al cargar categorizaciones: ' . $e->getMessage());
-        echo json_encode(['success' => false, 'error' => 'Error de Base de Datos: ' . $e->getMessage()]);
+        } catch (Exception $e) {
+            
+            error_log('[ARBITRIOS] Error SQL al cargar categorizaciones: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Error de Base de Datos: ' . $e->getMessage()]);
+        }
+        exit;
     }
-    exit;
-}
+
     
-    // Crear nueva categorización
-// Crear nueva categorización - CORREGIDO
-// En arbitrios.php - método crearCategorizacion
-// En el método crearCategorizacion() - VERSIÓN CORREGIDA
-public function crearCategorizacion() {
-    $data = json_decode(file_get_contents('php://input'), true);
-    
-    // DEPURACIÓN DETALLADA
-    error_log('==========================================');
-    error_log('[ARBITRIOS] CREAR CATEGORIZACIÓN - DATOS RAW: ' . file_get_contents('php://input'));
-    error_log('[ARBITRIOS] Datos decodificados:');
-    error_log(print_r($data, true));
-    
-    $required = ['id_contribuyente', 'id_predio', 'anio', 'item'];
-    foreach ($required as $field) {
-        if (empty($data[$field])) {
-            echo json_encode(['error' => "Campo requerido: {$field}"]);
+    public function getCategorizaciones() {
+        
+        $idPredio = $_GET['id_predio'] ?? null;
+        $idContribuyente = $_GET['id_contribuyente'] ?? null;
+        if (!$idPredio || !$idContribuyente) {
+            echo json_encode(['success' => false, 'error' => 'Parámetros incompletos (id_predio o id_contribuyente)']);
             exit;
         }
+
+        $sql = "
+            SELECT
+                ad.id_arbitrio_detalle,
+                ad.anio,
+                ad.item,
+                ad.enero::int AS enero, ad.febrero::int AS febrero, ad.marzo::int AS marzo,
+                ad.abril::int AS abril, ad.mayo::int AS mayo, ad.junio::int AS junio,
+                ad.julio::int AS julio, ad.agosto::int AS agosto, ad.septiembre::int AS septiembre,
+                ad.octubre::int AS octubre, ad.noviembre::int AS noviembre, ad.diciembre::int AS diciembre,
+                COALESCE(tlp.denominacion, 'N/A') AS categoria_limpieza,
+                COALESCE(tpj.denominacion, 'N/A') AS categoria_parques,
+                COALESCE(trs.denominacion, 'N/A') AS categoria_residuos,
+                COALESCE(tsr.denominacion, 'N/A') AS categoria_serenazgo,
+                COALESCE(elp.denominacion, 'Afecto al arbitrio') AS exoneracion_limpieza,
+                COALESCE(epj.denominacion, 'Afecto al arbitrio') AS exoneracion_parques,
+                COALESCE(ers.denominacion, 'Afecto al arbitrio') AS exoneracion_residuos,
+                COALESCE(esr.denominacion, 'Afecto al arbitrio') AS exoneracion_serenazgo,
+                ad.monto_base, ad.interes, ad.mora, ad.monto_final,
+                ad.usuario_actualizado,
+                TO_CHAR(ad.fecha_actualizado, 'YYYY-MM-DD HH24:MI') AS fecha_actualizado
+            FROM arb.arbitrio_detalle ad
+            INNER JOIN arb.arbitrio a ON ad.id_arbitrio = a.id_arbitrio
+            LEFT JOIN arb.tipo_beneficio tlp ON ad.id_tipo_beneficio_limpieza_publica = tlp.id_tipo_beneficio
+            LEFT JOIN arb.tipo_beneficio tpj ON ad.id_tipo_beneficio_parques_jardines = tpj.id_tipo_beneficio
+            LEFT JOIN arb.tipo_beneficio trs ON ad.id_tipo_beneficio_relleno_sanitario = trs.id_tipo_beneficio
+            LEFT JOIN arb.tipo_beneficio tsr ON ad.id_tipo_beneficio_serenazgo = tsr.id_tipo_beneficio
+            LEFT JOIN arb.tipo_beneficio elp ON ad.id_exoneracion_limpieza_publica = elp.id_tipo_beneficio
+            LEFT JOIN arb.tipo_beneficio epj ON ad.id_exoneracion_parques_jardines = epj.id_tipo_beneficio
+            LEFT JOIN arb.tipo_beneficio ers ON ad.id_exoneracion_relleno_sanitario = ers.id_tipo_beneficio
+            LEFT JOIN arb.tipo_beneficio esr ON ad.id_exoneracion_serenazgo = esr.id_tipo_beneficio
+            WHERE a.id_predio = :id_predio AND a.id_contribuyente = :id_contribuyente
+            ORDER BY ad.anio DESC, ad.item DESC;
+        ";
+
+        try {
+            $params = [':id_predio' => $idPredio, ':id_contribuyente' => $idContribuyente];
+            $data = $this->modelo->query($sql, $params);
+            echo json_encode(['success' => true, 'datos' => $data]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error SQL en getCategorizaciones: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Error de Base de Datos: ' . $e->getMessage()]);
+        }
+        exit;
     }
     
-    try {
-        // Convertir IDs a enteros
+    
+
+    public function crearCategorizacion() {
+        $data = json_decode(file_get_contents('php://input'), true);
+        
+        
+        error_log('==========================================');
+        error_log('[ARBITRIOS] CREAR CATEGORIZACIÓN - DATOS RAW: ' . file_get_contents('php://input'));
+        error_log('[ARBITRIOS] Datos decodificados:');
+        error_log(print_r($data, true));
+        
+        $required = ['id_contribuyente', 'id_predio', 'anio', 'item'];
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                echo json_encode(['error' => "Campo requerido: {$field}"]);
+                exit;
+            }
+        }
+        
+        try {
         $idContribuyente = (int)$data['id_contribuyente'];
         $idPredio = (int)$data['id_predio'];
         $anio = (int)$data['anio'];
         
-        // Buscar si ya existe un arbitrio para este contribuyente y predio
+        
         $sqlArbitrio = "SELECT id_arbitrio FROM arb.arbitrio 
                        WHERE id_contribuyente = :id_contribuyente 
                        AND id_predio = :id_predio
@@ -276,21 +389,21 @@ public function crearCategorizacion() {
         $idArbitrio = null;
         
         if (!empty($arbitrio)) {
-            // Usar el arbitrio existente
+            
             $idArbitrio = (int)$arbitrio[0]['id_arbitrio'];
             error_log('[ARBITRIOS] Usando arbitrio existente ID: ' . $idArbitrio);
         } else {
-            // Crear nuevo arbitrio
+            
             error_log('[ARBITRIOS] Creando nuevo arbitrio para contribuyente ' . $idContribuyente . ' y predio ' . $idPredio);
             
-            // Obtener el próximo ID de arbitrio
+            
             $sqlMaxId = "SELECT COALESCE(MAX(id_arbitrio), 0) as max_id FROM arb.arbitrio";
             $result = $this->modelo->consultaPersonalizada($sqlMaxId);
             $nextIdArbitrio = (int)$result[0]['max_id'] + 1;
             
             error_log('[ARBITRIOS] Nuevo ID arbitrio: ' . $nextIdArbitrio);
             
-            // Crear el arbitrio (registro padre)
+            
             $sqlInsertArbitrio = "INSERT INTO arb.arbitrio (
                 id_arbitrio, id_contribuyente, id_predio, id_tipo_registro_origen, 
                 anio, estado, observacion, usuario_actualizado, fecha_actualizado
@@ -310,14 +423,14 @@ public function crearCategorizacion() {
             error_log('[ARBITRIOS] Arbitrio creado con ID: ' . $idArbitrio);
         }
         
-        // Ahora crear el detalle de arbitrio
+        
         $sqlMaxDetalle = "SELECT COALESCE(MAX(id_arbitrio_detalle), 0) as max_id FROM arb.arbitrio_detalle";
         $resultDetalle = $this->modelo->consultaPersonalizada($sqlMaxDetalle);
         $nextIdDetalle = (int)$resultDetalle[0]['max_id'] + 1;
         
         error_log('[ARBITRIOS] Creando detalle con ID: ' . $nextIdDetalle . ' para arbitrio: ' . $idArbitrio);
         
-        // Función para manejar valores vacíos
+        
         function parseValue($value) {
             if ($value === '' || $value === null || $value === 'null') {
                 return null;
@@ -325,7 +438,7 @@ public function crearCategorizacion() {
             return (int)$value;
         }
         
-        // Preparar valores de categoría y exoneración
+        
         $id_limpieza = parseValue($data['id_tipo_beneficio_limpieza_publica'] ?? '');
         $id_parques = parseValue($data['id_tipo_beneficio_parques_jardines'] ?? '');
         $id_residuos = parseValue($data['id_tipo_beneficio_relleno_sanitario'] ?? '');
@@ -377,17 +490,17 @@ public function crearCategorizacion() {
         $params = [
             'id_detalle' => $nextIdDetalle,
             'id_arbitrio' => $idArbitrio,
-            // Categorías
+            
             'id_limpieza' => $id_limpieza,
             'id_parques' => $id_parques,
             'id_residuos' => $id_residuos,
             'id_serenazgo' => $id_serenazgo,
-            // Exoneraciones
+            
             'ex_limpieza' => $ex_limpieza,
             'ex_parques' => $ex_parques,
             'ex_residuos' => $ex_residuos,
             'ex_serenazgo' => $ex_serenazgo,
-            // Otros campos
+            
             'frentera' => (float)($data['frentera_metros'] ?? 0),
             'frecuencia' => (int)($data['frecuencia_barrido'] ?? 1),
             'habitantes' => (int)($data['nro_habitantes'] ?? 1),
@@ -416,7 +529,7 @@ public function crearCategorizacion() {
         
         $this->modelo->query($sqlInsert, $params);
         
-        // Verificar qué se insertó
+        
         $sqlVerify = "SELECT 
             id_tipo_beneficio_limpieza_publica,
             id_tipo_beneficio_parques_jardines,
@@ -443,63 +556,154 @@ public function crearCategorizacion() {
     } catch (Exception $e) {
         error_log('[ARBITRIOS] ERROR completo: ' . $e->getMessage());
         error_log('[ARBITRIOS] Traza: ' . $e->getTraceAsString());
-        echo json_encode(['error' => 'Error en la base de datos: ' . $e->getMessage()]);
-    }
-    
-    exit;
-}
-    
-    // Clonar categorización existente
-// En el método clonarCategorizacion()
-public function clonarCategorizacion() {
-    $data = json_decode(file_get_contents('php://input'), true);
-    
-    $idDetalle = $data['id_arbitrio_detalle'] ?? null;
-    $nuevoAnio = $data['nuevo_anio'] ?? null;
-    $nuevoItem = $data['nuevo_item'] ?? null;
-    
-    if (!$idDetalle || !$nuevoAnio || !$nuevoItem) {
-        echo json_encode(['error' => 'Datos incompletos']);
+            echo json_encode(['error' => 'Error en la base de datos: ' . $e->getMessage()]);
+        }
+        
         exit;
     }
     
-    try {
-        // Obtener datos de la categorización original
-        $sqlOriginal = "SELECT ad.*, a.id_contribuyente, a.id_predio 
-                       FROM arb.arbitrio_detalle ad
-                       INNER JOIN arb.arbitrio a ON a.id_arbitrio = ad.id_arbitrio
-                       WHERE ad.id_arbitrio_detalle = :id_detalle";
-        
-        $original = $this->modelo->query($sqlOriginal, ['id_detalle' => $idDetalle]);
-        
-        if (empty($original)) {
-            echo json_encode(['error' => 'Categorización no encontrada']);
+    
+    public function getCategorizacionDetalle() {
+        header('Content-Type: application/json; charset=utf-8');
+        $idDetalle = $_GET['id_detalle'] ?? null;
+        if (!$idDetalle) {
+            echo json_encode(['success' => false, 'error' => 'Falta id_detalle']);
             exit;
         }
-        
-        $original = $original[0];
-        $idArbitrio = $original['id_arbitrio'];
-        
-        // Verificar que el arbitrio existe
-        $sqlCheckArbitrio = "SELECT 1 FROM arb.arbitrio WHERE id_arbitrio = :id_arbitrio";
-        $existeArbitrio = $this->modelo->query($sqlCheckArbitrio, ['id_arbitrio' => $idArbitrio]);
-        
-        if (empty($existeArbitrio)) {
-            echo json_encode(['error' => 'El arbitrio padre no existe']);
-            exit;
+        try {
+            $sql = "SELECT 
+                        ad.id_arbitrio_detalle,
+                        ad.id_arbitrio,
+                        ad.anio,
+                        ad.item,
+                        ad.frentera_metros,
+                        ad.frecuencia_barrido,
+                        ad.nro_habitantes,
+                        ad.area_construida,
+                        ad.area_terreno,
+                        ad.tiene_licencia,
+                        ad.porcentaje_inseguridad,
+                        ad.distancia_a_parque,
+                        ad.enero::int AS enero, ad.febrero::int AS febrero, ad.marzo::int AS marzo,
+                        ad.abril::int AS abril, ad.mayo::int AS mayo, ad.junio::int AS junio,
+                        ad.julio::int AS julio, ad.agosto::int AS agosto, ad.septiembre::int AS septiembre,
+                        ad.octubre::int AS octubre, ad.noviembre::int AS noviembre, ad.diciembre::int AS diciembre,
+                        ad.id_tipo_beneficio_limpieza_publica,
+                        ad.id_tipo_beneficio_parques_jardines,
+                        ad.id_tipo_beneficio_relleno_sanitario,
+                        ad.id_tipo_beneficio_serenazgo,
+                        ad.id_exoneracion_limpieza_publica,
+                        ad.id_exoneracion_parques_jardines,
+                        ad.id_exoneracion_relleno_sanitario,
+                        ad.id_exoneracion_serenazgo
+                    FROM arb.arbitrio_detalle ad
+                    WHERE ad.id_arbitrio_detalle = :id_detalle";
+            $data = $this->modelo->query($sql, [':id_detalle' => $idDetalle]);
+            if (empty($data)) {
+                echo json_encode(['success' => false, 'error' => 'No encontrado']);
+                exit;
+            }
+            echo json_encode(['success' => true, 'data' => $data[0]]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error getCategorizacionDetalle: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
-        
-        // ... resto del código para clonar ...
-        
-    } catch (Exception $e) {
-        error_log('[ARBITRIOS] Error al clonar: ' . $e->getMessage());
-        echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+        exit;
     }
+
     
-    exit;
-}
+    public function actualizarCategorizacion() {
+        header('Content-Type: application/json; charset=utf-8');
+        $data = json_decode(file_get_contents('php://input'), true);
+        if (!$data) {
+            echo json_encode(['success' => false, 'error' => 'JSON inválido']);
+            exit;
+        }
+
+        $idDetalle = $data['id_arbitrio_detalle'] ?? null;
+        if (!$idDetalle) {
+            echo json_encode(['success' => false, 'error' => 'Falta id_arbitrio_detalle']);
+            exit;
+        }
+
+        $parseValue = function($value) {
+            if ($value === '' || $value === null || $value === 'null') return null;
+            return (int)$value;
+        };
+
+        try {
+            $sql = "UPDATE arb.arbitrio_detalle SET
+                        anio = :anio,
+                        item = :item,
+                        frentera_metros = :frentera,
+                        frecuencia_barrido = :frecuencia,
+                        nro_habitantes = :habitantes,
+                        area_construida = :area_construida,
+                        area_terreno = :area_terreno,
+                        tiene_licencia = :tiene_licencia,
+                        porcentaje_inseguridad = :inseguridad,
+                        distancia_a_parque = :distancia_parque,
+                        enero = :enero, febrero = :febrero, marzo = :marzo,
+                        abril = :abril, mayo = :mayo, junio = :junio,
+                        julio = :julio, agosto = :agosto, septiembre = :septiembre,
+                        octubre = :octubre, noviembre = :noviembre, diciembre = :diciembre,
+                        id_tipo_beneficio_limpieza_publica = :id_limpieza,
+                        id_tipo_beneficio_parques_jardines = :id_parques,
+                        id_tipo_beneficio_relleno_sanitario = :id_residuos,
+                        id_tipo_beneficio_serenazgo = :id_serenazgo,
+                        id_exoneracion_limpieza_publica = :ex_limpieza,
+                        id_exoneracion_parques_jardines = :ex_parques,
+                        id_exoneracion_relleno_sanitario = :ex_residuos,
+                        id_exoneracion_serenazgo = :ex_serenazgo,
+                        usuario_actualizado = 'SISTEMA_EDIT',
+                        fecha_actualizado = CURRENT_TIMESTAMP
+                    WHERE id_arbitrio_detalle = :id_detalle
+                    RETURNING id_arbitrio, id_arbitrio_detalle";
+
+            $params = [
+                'id_detalle' => (int)$idDetalle,
+                'anio' => (int)($data['anio'] ?? date('Y')),
+                'item' => (int)($data['item'] ?? 1),
+                'frentera' => (float)($data['frentera_metros'] ?? 0),
+                'frecuencia' => (int)($data['frecuencia_barrido'] ?? 1),
+                'habitantes' => (int)($data['nro_habitantes'] ?? 1),
+                'area_construida' => (float)($data['area_construida'] ?? 0),
+                'area_terreno' => (float)($data['area_terreno'] ?? 0),
+                'tiene_licencia' => (int)($data['tiene_licencia'] ?? 0),
+                'inseguridad' => (float)($data['porcentaje_inseguridad'] ?? 0),
+                'distancia_parque' => (float)($data['distancia_a_parque'] ?? 0),
+                'enero' => (int)($data['enero'] ?? 0),
+                'febrero' => (int)($data['febrero'] ?? 0),
+                'marzo' => (int)($data['marzo'] ?? 0),
+                'abril' => (int)($data['abril'] ?? 0),
+                'mayo' => (int)($data['mayo'] ?? 0),
+                'junio' => (int)($data['junio'] ?? 0),
+                'julio' => (int)($data['julio'] ?? 0),
+                'agosto' => (int)($data['agosto'] ?? 0),
+                'septiembre' => (int)($data['septiembre'] ?? 0),
+                'octubre' => (int)($data['octubre'] ?? 0),
+                'noviembre' => (int)($data['noviembre'] ?? 0),
+                'diciembre' => (int)($data['diciembre'] ?? 0),
+                'id_limpieza' => $parseValue($data['id_tipo_beneficio_limpieza_publica'] ?? null),
+                'id_parques' => $parseValue($data['id_tipo_beneficio_parques_jardines'] ?? null),
+                'id_residuos' => $parseValue($data['id_tipo_beneficio_relleno_sanitario'] ?? null),
+                'id_serenazgo' => $parseValue($data['id_tipo_beneficio_serenazgo'] ?? null),
+                'ex_limpieza' => $parseValue($data['exoneracion_limpieza_publica'] ?? null),
+                'ex_parques' => $parseValue($data['exoneracion_parques_jardines'] ?? null),
+                'ex_residuos' => $parseValue($data['exoneracion_relleno_sanitario'] ?? null),
+                'ex_serenazgo' => $parseValue($data['exoneracion_serenazgo'] ?? null),
+            ];
+
+            $res = $this->modelo->query($sql, $params);
+            echo json_encode(['success' => true, 'message' => 'Actualizado correctamente', 'data' => $res[0] ?? null]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error actualizarCategorizacion: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     
-    // Eliminar categorización
     public function eliminarCategorizacion() {
         $idDetalle = $_GET['id_detalle'] ?? null;
         
@@ -526,90 +730,10 @@ public function clonarCategorizacion() {
         exit;
     }
 
-    // ============ NUEVOS MÉTODOS PARA IMPORTACIÓN ============
     
-    // Obtener licencias de funcionamiento para un contribuyente
-    public function getLicencias() {
-        $idContribuyente = $_GET['id'] ?? null;
-        
-        if (!$idContribuyente) {
-            echo json_encode(['error' => 'Falta ID del contribuyente']);
-            exit;
-        }
-        
-        // CONSULTA CORREGIDA - Más simple y robusta
-        $sql = "SELECT 
-                    l.id_licencia as id,
-                    l.nro_licencia as codigo,
-                    COALESCE(
-                        TRIM(
-                            CONCAT(
-                                COALESCE(p.nombre_predio, ''),
-                                CASE 
-                                    WHEN p.nombre_predio IS NOT NULL AND (v.nombre IS NOT NULL OR p.numero IS NOT NULL) THEN ' - '
-                                    ELSE ''
-                                END,
-                                COALESCE(v.nombre, ''),
-                                CASE 
-                                    WHEN v.nombre IS NOT NULL AND p.numero IS NOT NULL THEN ' '
-                                    ELSE ''
-                                END,
-                                COALESCE(p.numero, ''),
-                                CASE 
-                                    WHEN p.letra IS NOT NULL AND TRIM(p.letra) != '' THEN ' ' || p.letra
-                                    ELSE ''
-                                END
-                            )
-                        ),
-                        'Sin dirección'
-                    ) as direccion,
-                    CONCAT(
-                        'Licencia: ', l.nro_licencia, 
-                        ' | Categoría: ', COALESCE(l.categoria_licencia, 'Sin categoría'),
-                        ' | Vence: ', TO_CHAR(l.fecha_vencimiento, 'DD/MM/YYYY')
-                    ) as adicional,
-                    l.id_predio
-                FROM arb.licencia_funcionamiento l
-                LEFT JOIN gen.gen_predio p ON p.id = l.id_predio
-                LEFT JOIN gen.gen_via v ON v.id = p.id_via
-                WHERE l.id_contribuyente = :id_contribuyente
-                AND l.estado = 'activo'
-                ORDER BY l.fecha_emision DESC";
-        
-        // DEBUG: Ver la consulta
-        error_log("Consulta licencias SQL: " . $sql);
-        error_log("ID contribuyente: " . $idContribuyente);
-        
-        try {
-            $licencias = $this->modelo->query($sql, ['id_contribuyente' => $idContribuyente]);
-            
-            error_log("Licencias encontradas: " . count($licencias));
-            if (count($licencias) > 0) {
-                error_log("Primera licencia: " . print_r($licencias[0], true));
-            }
-            
-            header('Content-Type: application/json');
-            echo json_encode([
-                'success' => true, 
-                'data' => $licencias,
-                'debug' => [
-                    'total' => count($licencias),
-                    'contribuyente' => $idContribuyente
-                ]
-            ]);
-            
-        } catch (Exception $e) {
-            error_log("ERROR en getLicencias: " . $e->getMessage());
-            echo json_encode([
-                'success' => false, 
-                'error' => 'Error en consulta: ' . $e->getMessage()
-            ]);
-        }
-        
-        exit;
-    }
+    
 
-    // Obtener declaraciones juradas para un contribuyente
+    
     public function getDeclaraciones() {
         $idContribuyente = $_GET['id'] ?? null;
         
@@ -618,7 +742,7 @@ public function clonarCategorizacion() {
             exit;
         }
         
-        // CONSULTA CORREGIDA
+        
         $sql = "SELECT 
                     d.id_declaracion_jurada as id,
                     CONCAT('DDJJ-', d.anio, '-', LPAD(d.id_declaracion_jurada::text, 3, '0')) as codigo,
@@ -649,7 +773,9 @@ public function clonarCategorizacion() {
                 FROM arb.declaracion_jurada d
                 LEFT JOIN gen.gen_predio p ON p.id = d.id_predio
                 LEFT JOIN gen.gen_via v ON v.id = p.id_via
+                LEFT JOIN arb.arbitrio a ON a.id_predio = d.id_predio AND a.id_contribuyente = d.id_contribuyente
                 WHERE d.id_contribuyente = :id_contribuyente
+                  AND a.id_arbitrio IS NULL
                 ORDER BY d.anio DESC, d.id_declaracion_jurada DESC";
         
         error_log("Consulta DDJJ SQL: " . $sql);
@@ -684,20 +810,20 @@ public function clonarCategorizacion() {
         exit;
     }
 
-    // Importar predios seleccionados a arbitrios
-public function importarPredios() {
-    $data = json_decode(file_get_contents('php://input'), true);
     
-    $idContribuyente = $data['id_contribuyente'] ?? null;
-    $predios = $data['predios'] ?? [];
-    $tipoFuente = $data['tipo_fuente'] ?? '';
-    
-    if (!$idContribuyente || empty($predios)) {
-        echo json_encode(['error' => 'Datos incompletos']);
-        exit;
-    }
-    
-    try {
+    public function importarPredios() {
+        $data = json_decode(file_get_contents('php://input'), true);
+        
+        $idContribuyente = $data['id_contribuyente'] ?? null;
+        $predios = $data['predios'] ?? [];
+        $tipoFuente = $data['tipo_fuente'] ?? '';
+        
+        if (!$idContribuyente || empty($predios)) {
+            echo json_encode(['error' => 'Datos incompletos']);
+            exit;
+        }
+        
+        try {
         $importados = 0;
         $noImportados = 0;
         $errors = [];
@@ -707,7 +833,7 @@ public function importarPredios() {
             $idPredio = $predio['id_predio'];
             $codigoPredio = $predio['codigo'] ?? 'N/A';
             
-            // Verificar si el predio ya existe en arbitrios para este contribuyente
+            
             $sqlCheck = "SELECT COUNT(*) as existe, 
                                 id_arbitrio,
                                 id_tipo_registro_origen,
@@ -728,20 +854,20 @@ public function importarPredios() {
                 continue;
             }
             
-            // Determinar el tipo_registro_origen según la fuente
-            $idTipoRegistro = 1; // Por defecto: Registro de Propiedad
+            
+            $idTipoRegistro = 1; 
             if ($tipoFuente === 'licencias') {
-                $idTipoRegistro = 3; // Licencia de Funcionamiento
+                $idTipoRegistro = 3; 
             } elseif ($tipoFuente === 'declaraciones') {
-                $idTipoRegistro = 2; // Declaración de Impuesto Predial
+                $idTipoRegistro = 2; 
             }
             
-            // Obtener el próximo ID de arbitrio
+            
             $nextId = $this->modelo->consultaPersonalizada(
                 "SELECT COALESCE(MAX(id_arbitrio), 0) + 1 as next_id FROM arb.arbitrio"
             )[0]['next_id'];
             
-            // Insertar nuevo registro en arbitrios
+            
             $sqlInsert = "INSERT INTO arb.arbitrio 
                         (id_arbitrio, id_contribuyente, id_predio, id_tipo_registro_origen, 
                          anio, estado, observacion, usuario_actualizado, fecha_actualizado)
@@ -782,26 +908,25 @@ public function importarPredios() {
             'errors' => $errors
         ]);
         
-    } catch (Exception $e) {
-        echo json_encode(['error' => 'Error al importar: ' . $e->getMessage()]);
+        } catch (Exception $e) {
+            echo json_encode(['error' => 'Error al importar: ' . $e->getMessage()]);
+        }
+        
+        exit;
     }
-    
-    exit;
-}
 
-// Método auxiliar para obtener nombre del tipo de origen
-private function getTipoOrigen($idTipoRegistro) {
-    $tipos = [
-        1 => 'Registro de Propiedad',
-        2 => 'Declaración Jurada',
-        3 => 'Licencia de Funcionamiento',
-        4 => 'Otro Origen'
-    ];
-    
-    return $tipos[$idTipoRegistro] ?? 'Desconocido';
-}
+    private function getTipoOrigen($idTipoRegistro) {
+        $tipos = [
+            1 => 'Registro de Propiedad',
+            2 => 'Declaración Jurada',
+            3 => 'Licencia de Funcionamiento',
+            4 => 'Otro Origen'
+        ];
+        
+        return $tipos[$idTipoRegistro] ?? 'Desconocido';
+    }
 
-    // Método para buscar predios generales
+    
     public function buscarPredios() {
         $searchTerm = $_GET['q'] ?? '';
         
@@ -832,7 +957,7 @@ private function getTipoOrigen($idTipoRegistro) {
         exit;
     }
     
-    // Agregar un predio manualmente
+    
     public function agregarPredio() {
         $data = $_POST;
         
@@ -845,7 +970,7 @@ private function getTipoOrigen($idTipoRegistro) {
         }
         
         try {
-            // Verificar si ya existe
+            
             $sqlCheck = "SELECT COUNT(*) as existe FROM arb.arbitrio 
                         WHERE id_contribuyente = :id_contribuyente 
                         AND id_predio = :id_predio";
@@ -860,12 +985,12 @@ private function getTipoOrigen($idTipoRegistro) {
                 exit;
             }
             
-            // Obtener próximo ID
+            
             $nextId = $this->modelo->consultaPersonalizada(
                 "SELECT COALESCE(MAX(id_arbitrio), 0) + 1 as next_id FROM arb.arbitrio"
             )[0]['next_id'];
             
-            // Insertar
+            
             $sqlInsert = "INSERT INTO arb.arbitrio 
                         (id_arbitrio, id_contribuyente, id_predio, id_tipo_registro_origen, 
                          anio, estado, usuario_actualizado, fecha_actualizado)
@@ -895,22 +1020,26 @@ private function getTipoOrigen($idTipoRegistro) {
         exit;
     }
 
-    // ============ MÉTODOS PARA PROCESAR CUENTA CORRIENTE ============
-
-// Procesar cuenta corriente de predios seleccionados
-// Reemplaza el método procesarCuentaCorriente con esta versión mejorada
-public function procesarCuentaCorriente() {
-    header('Content-Type: application/json');
     
-    try {
-        $input = file_get_contents('php://input');
-        $data = json_decode($input, true);
+
+    public function procesarCuentaCorriente() {
+        header('Content-Type: application/json');
+        
+        try {
+            $input = file_get_contents('php://input');
+            $data = json_decode($input, true);
         
         error_log('[ARBITRIOS] === PROCESAR CUENTA CORRIENTE - VERSIÓN CORREGIDA ===');
         error_log('[ARBITRIOS] Datos recibidos: ' . print_r($data, true));
         
         if (!$data || empty($data['predios'])) {
             echo json_encode(['error' => 'No hay predios seleccionados']);
+            exit;
+        }
+
+        $idContribuyente = (int)($data['id_contribuyente'] ?? 0);
+        if ($idContribuyente <= 0) {
+            echo json_encode(['error' => 'Falta el contribuyente para procesar la cuenta corriente']);
             exit;
         }
         
@@ -920,12 +1049,14 @@ public function procesarCuentaCorriente() {
         $detalles = [];
         $totalProcesado = 0;
         $prediosConCategorizaciones = 0;
+
+        $predios = array_unique($data['predios']);
         
-        foreach ($data['predios'] as $idPredio) {
+        foreach ($predios as $idPredio) {
             error_log('[ARBITRIOS] Procesando predio ID: ' . $idPredio);
             
-            // 1. Buscar el arbitrio asociado a este predio
-            $sqlArbitrio = "SELECT 
+            
+            $sqlArbitrios = "SELECT 
                                 a.id_arbitrio,
                                 a.id_contribuyente,
                                 p.codigo_catastral,
@@ -934,11 +1065,15 @@ public function procesarCuentaCorriente() {
                             INNER JOIN gen.gen_predio p ON p.id = a.id_predio
                             INNER JOIN gen.gen_contribuyente c ON c.id = a.id_contribuyente
                             WHERE a.id_predio = :id_predio
-                            LIMIT 1";
-            
-            $arbitrioInfo = $this->modelo->query($sqlArbitrio, ['id_predio' => $idPredio]);
-            
-            if (empty($arbitrioInfo)) {
+                            AND a.id_contribuyente = :id_contribuyente
+                            ORDER BY a.fecha_actualizado DESC, a.id_arbitrio DESC";
+
+            $arbitriosInfo = $this->modelo->query($sqlArbitrios, [
+                'id_predio' => $idPredio,
+                'id_contribuyente' => $idContribuyente
+            ]);
+
+            if (empty($arbitriosInfo)) {
                 $detalles[] = [
                     'tributo' => 'Arbitrios',
                     'predio' => 'N/A',
@@ -949,18 +1084,15 @@ public function procesarCuentaCorriente() {
                     'mora' => 0,
                     'total' => 0,
                     'estado' => '✗ Error',
-                    'mensaje' => 'Predio no registrado en arbitrios'
+                    'mensaje' => 'Predio no pertenece al contribuyente o no está registrado'
                 ];
                 continue;
             }
             
-            $arbitrioInfo = $arbitrioInfo[0];
-            $idArbitrio = $arbitrioInfo['id_arbitrio'];
-            error_log('[ARBITRIOS] ID Arbitrio encontrado: ' . $idArbitrio);
             
-            // 2. Buscar categorizaciones para este arbitrio
             $sqlCategorizaciones = "SELECT 
                                         ad.id_arbitrio_detalle,
+                                        ad.id_arbitrio,
                                         ad.anio,
                                         ad.item,
                                         ad.monto_base,
@@ -973,45 +1105,44 @@ public function procesarCuentaCorriente() {
                                     WHERE ad.id_arbitrio = :id_arbitrio
                                     AND ad.anio BETWEEN :anio_desde AND :anio_hasta
                                     ORDER BY ad.anio DESC, ad.item DESC";
-            
-            $categorizaciones = $this->modelo->query($sqlCategorizaciones, [
-                'id_arbitrio' => $idArbitrio,
-                'anio_desde' => $anioDesde,
-                'anio_hasta' => $anioHasta
-            ]);
-            
-            error_log('[ARBITRIOS] Categorizaciones encontradas para arbitrio ' . $idArbitrio . ': ' . count($categorizaciones));
-            
-            if (empty($categorizaciones)) {
-                $detalles[] = [
-                    'tributo' => 'Arbitrios',
-                    'predio' => $arbitrioInfo['codigo_catastral'],
-                    'codigo' => 'ARB-' . $arbitrioInfo['codigo_catastral'],
-                    'fecha_vencimiento' => $data['fecha_vencimiento'] ?? date('Y-m-d'),
-                    'monto_base' => 0,
-                    'interes' => 0,
-                    'mora' => 0,
-                    'total' => 0,
-                    'estado' => '✗ Error',
-                    'mensaje' => 'No hay categorizaciones para el período ' . $anioDesde . '-' . $anioHasta
-                ];
-                continue;
-            }
-            
-            // 3. Procesar cada categorización
-            foreach ($categorizaciones as $cat) {
+
+            $tieneCategorizaciones = false;
+            $predioTuvoProcesados = false;
+            $vistos = [];
+
+            foreach ($arbitriosInfo as $arbInfo) {
+                $idArbitrio = $arbInfo['id_arbitrio'];
+                error_log('[ARBITRIOS] Buscando categorizaciones para arbitrio ID: ' . $idArbitrio);
+
+                $categorizaciones = $this->modelo->query($sqlCategorizaciones, [
+                    'id_arbitrio' => $idArbitrio,
+                    'anio_desde' => $anioDesde,
+                    'anio_hasta' => $anioHasta
+                ]);
+
+                if (empty($categorizaciones)) {
+                    continue;
+                }
+                $tieneCategorizaciones = true;
+
+                
+                foreach ($categorizaciones as $cat) {
+                    
+                    $clave = $cat['anio'] . '-' . $cat['item'];
+                    if (isset($vistos[$clave])) continue;
+                    $vistos[$clave] = true;
                 error_log('[ARBITRIOS] Procesando categorización ID: ' . $cat['id_arbitrio_detalle'] . 
                          ' - Monto base: ' . $cat['monto_base']);
                 
-                // Intentar actualizar cálculo
+                
                 $montoActualizado = null;
                 
                 try {
-                    // Intentar con función PostgreSQL
+                    
                     $sqlActualizar = "SELECT arb.fn_actualizar_mora_interes(:id_detalle)";
                     $this->modelo->query($sqlActualizar, ['id_detalle' => $cat['id_arbitrio_detalle']]);
                     
-                    // Obtener datos actualizados
+                    
                     $sqlActualizado = "SELECT 
                                         monto_base, 
                                         interes, 
@@ -1031,7 +1162,7 @@ public function procesarCuentaCorriente() {
                     
                 } catch (Exception $e) {
                     error_log('[ARBITRIOS] Error al usar función: ' . $e->getMessage());
-                    // Si falla, usar los datos existentes
+                    
                     $montoActualizado = [
                         'monto_base' => $cat['monto_base'],
                         'interes' => $cat['interes'],
@@ -1044,8 +1175,8 @@ public function procesarCuentaCorriente() {
                 if ($montoActualizado) {
                     $detalle = [
                         'tributo' => 'Arbitrios',
-                        'predio' => $arbitrioInfo['codigo_catastral'],
-                        'codigo' => 'ARB-' . $arbitrioInfo['codigo_catastral'] . '-' . $cat['anio'] . '-' . $cat['item'],
+                        'predio' => $arbInfo['codigo_catastral'],
+                        'codigo' => 'ARB-' . $arbInfo['codigo_catastral'] . '-' . $cat['anio'] . '-' . $cat['item'],
                         'fecha_vencimiento' => $data['fecha_vencimiento'] ?? date('Y-m-d', strtotime('+30 days')),
                         'monto_base' => (float)$montoActualizado['monto_base'],
                         'interes' => (float)$montoActualizado['interes'],
@@ -1055,20 +1186,42 @@ public function procesarCuentaCorriente() {
                         'mensaje' => 'Cálculo actualizado',
                         'anio' => $cat['anio'],
                         'item' => $cat['item'],
-                        'contribuyente' => $arbitrioInfo['nombre_contribuyente'],
+                        'contribuyente' => $arbInfo['nombre_contribuyente'],
                         'fecha_actualizacion' => $montoActualizado['fecha_formateada']
                     ];
                     
                     $detalles[] = $detalle;
                     $totalProcesado += (float)$montoActualizado['monto_final'];
-                    $prediosConCategorizaciones++;
+                    $predioTuvoProcesados = true;
                     
                     error_log('[ARBITRIOS] Procesado: ' . json_encode($detalle));
                 }
             }
+            }
+
+            
+            if (!$tieneCategorizaciones) {
+                $info0 = $arbitriosInfo[0];
+                $detalles[] = [
+                    'tributo' => 'Arbitrios',
+                    'predio' => $info0['codigo_catastral'],
+                    'codigo' => 'ARB-' . $info0['codigo_catastral'],
+                    'fecha_vencimiento' => $data['fecha_vencimiento'] ?? date('Y-m-d'),
+                    'monto_base' => 0,
+                    'interes' => 0,
+                    'mora' => 0,
+                    'total' => 0,
+                    'estado' => '✗ Error',
+                    'mensaje' => 'No hay categorizaciones para el período ' . $anioDesde . '-' . $anioHasta
+                ];
+            }
+            
+            if ($predioTuvoProcesados) {
+                $prediosConCategorizaciones++;
+            }
         }
         
-        // 4. Preparar respuesta
+        
         $resultado = [
             'success' => true,
             'message' => 'Proceso completado',
@@ -1078,7 +1231,7 @@ public function procesarCuentaCorriente() {
             'detalles' => $detalles
         ];
         
-        // Estadísticas
+        
         $procesados = array_filter($detalles, function($d) { 
             return strpos($d['estado'], '✓') !== false; 
         });
@@ -1089,7 +1242,7 @@ public function procesarCuentaCorriente() {
         $resultado['estadisticas'] = [
             'procesados' => count($procesados),
             'errores' => count($errores),
-            'total_predios' => count($data['predios'])
+            'total_predios' => count($predios)
         ];
         
         error_log('[ARBITRIOS] Resultado final: Procesados=' . count($procesados) . 
@@ -1104,17 +1257,17 @@ public function procesarCuentaCorriente() {
         echo json_encode([
             'success' => false,
             'error' => 'Error del sistema: ' . $e->getMessage()
-        ]);
-    }
-    
-    exit;
-}
-
-private function calcularMoraInteresManual($idDetalle) {
-    try {
-        error_log('[ARBITRIOS] Calculando mora/interés manualmente para ID: ' . $idDetalle);
+            ]);
+        }
         
-        // Primero obtener los datos actuales con más información
+        exit;
+    }
+
+    private function calcularMoraInteresManual($idDetalle) {
+        try {
+            error_log('[ARBITRIOS] Calculando mora/interés manualmente para ID: ' . $idDetalle);
+        
+        
         $sqlDatos = "SELECT 
                         monto_base,
                         interes,
@@ -1134,17 +1287,17 @@ private function calcularMoraInteresManual($idDetalle) {
         
         $datos = $datos[0];
         $montoBase = (float)$datos['monto_base'];
-        $dias = max(0, (int)$datos['dias_transcurridos']); // No negativo
+        $dias = max(0, (int)$datos['dias_transcurridos']); 
         
-        // Si no han pasado días, no hay cambios
+        
         if ($dias === 0) {
             error_log('[ARBITRIOS] No han pasado días desde la última actualización');
             return true;
         }
         
-        // Usar las mismas tasas que la función PostgreSQL
-        $tasaInteres = 0.0005; // 0.05% diario
-        $tasaMora = 0.0003;    // 0.03% diario
+        
+        $tasaInteres = 0.0005; 
+        $tasaMora = 0.0003;    
         
         $interes = $montoBase * $tasaInteres * $dias;
         $mora = $montoBase * $tasaMora * $dias;
@@ -1157,7 +1310,7 @@ private function calcularMoraInteresManual($idDetalle) {
                  'Mora (' . ($tasaMora * 100) . '%): ' . $mora . ', ' .
                  'Total: ' . $total);
         
-        // Actualizar
+        
         $sqlUpdate = "UPDATE arb.arbitrio_detalle 
                      SET interes = :interes,
                          mora = :mora,
@@ -1176,15 +1329,15 @@ private function calcularMoraInteresManual($idDetalle) {
         error_log('[ARBITRIOS] Cálculo manual completado para ID: ' . 
                  ($result[0]['id_arbitrio_detalle'] ?? $idDetalle));
         
-        return true;
-        
-    } catch (Exception $e) {
-        error_log('[ARBITRIOS] Error en cálculo manual: ' . $e->getMessage());
-        return false;
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en cálculo manual: ' . $e->getMessage());
+            return false;
+        }
     }
-}
 
-    // Método para actualizar mora e interés
+    
     private function actualizarMoraInteres($idDetalle) {
         try {
             $sql = "SELECT arb.fn_actualizar_mora_interes(:id_detalle)";
@@ -1196,13 +1349,13 @@ private function calcularMoraInteresManual($idDetalle) {
         }
     }
 
-    // Método para generar registro en caja
-   private function generarRegistroCaja($idPredio, $idTributo, $datosArbitrio, $fechaVencimiento, $predioInfo) {
-    try {
-        // Obtener cajero activo
-        $idCajero = 1; // Temporal
+    
+    private function generarRegistroCaja($idPredio, $idTributo, $datosArbitrio, $fechaVencimiento, $predioInfo) {
+        try {
         
-        // Obtener siguiente número de recibo
+        $idCajero = 1; 
+        
+        
         $sqlNumeroRecibo = "SELECT numeracion_actual_recibo + 1 as siguiente 
                           FROM caj.cajero 
                           WHERE id = :id_cajero";
@@ -1210,7 +1363,7 @@ private function calcularMoraInteresManual($idDetalle) {
         $resultNumero = $this->modelo->query($sqlNumeroRecibo, ['id_cajero' => $idCajero]);
         $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
         
-        // Crear pago - ¡¡CORREGIDO!!
+        
         $sqlPago = "INSERT INTO caj.pago 
                    (id_usuario, id_cajero, id_tipo_pago, fecha_pago, total, observaciones)
                    VALUES (
@@ -1230,7 +1383,7 @@ private function calcularMoraInteresManual($idDetalle) {
         
         $idPago = $pago[0]['id'];
         
-        // Buscar concepto de pago
+        
         $sqlConcepto = "SELECT id FROM caj.concepto_pago 
                        WHERE descripcion ILIKE '%arbitrio%' 
                        LIMIT 1";
@@ -1238,7 +1391,7 @@ private function calcularMoraInteresManual($idDetalle) {
         $concepto = $this->modelo->query($sqlConcepto);
         $idConcepto = $concepto[0]['id'] ?? 1;
         
-        // Crear detalle
+        
         $sqlDetalle = "INSERT INTO caj.pago_detalle 
                       (id_pago, id_concepto_pago, cantidad, subtotal)
                       VALUES (:id_pago, :id_concepto, 1, :subtotal)";
@@ -1249,7 +1402,7 @@ private function calcularMoraInteresManual($idDetalle) {
             'subtotal' => $datosArbitrio['monto_final']
         ]);
         
-        // Generar recibo
+        
         $sqlRecibo = "INSERT INTO caj.recibo 
                      (id_pago, id_cajero, numero_recibo, fecha_emision, total, estado)
                      VALUES (:id_pago, :id_cajero, :numero_recibo, CURRENT_DATE, :total, 'PENDIENTE')
@@ -1262,7 +1415,7 @@ private function calcularMoraInteresManual($idDetalle) {
             'total' => $datosArbitrio['monto_final']
         ]);
         
-        // Actualizar numeración
+        
         $sqlActualizarCajero = "UPDATE caj.cajero 
                                SET numeracion_actual_recibo = :numero_recibo 
                                WHERE id = :id_cajero";
@@ -1272,30 +1425,30 @@ private function calcularMoraInteresManual($idDetalle) {
             'id_cajero' => $idCajero
         ]);
         
-        return $recibo[0]['id'];
-        
-    } catch (Exception $e) {
-        error_log('[ARBITRIOS] Error en generarRegistroCaja: ' . $e->getMessage());
-        throw new Exception('Error al generar recibo: ' . $e->getMessage());
+            return $recibo[0]['id'];
+            
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en generarRegistroCaja: ' . $e->getMessage());
+            throw new Exception('Error al generar recibo: ' . $e->getMessage());
+        }
     }
-}
 
-    // Método para generar recibos en caja (llamado desde JS)
-public function generarRecibosCaja() {
-    header('Content-Type: application/json');
     
-    try {
-        $input = file_get_contents('php://input');
-        $data = json_decode($input, true);
+    public function generarRecibosCaja() {
+        header('Content-Type: application/json');
         
-        error_log('[ARBITRIOS] === GENERAR RECIBOS CAJA ===');
-        error_log('[ARBITRIOS] Datos: ' . print_r($data, true));
-        
-        $predios = $data['predios'] ?? [];
-        $idCajero = $data['id_cajero'] ?? 1;
-        $fechaVencimiento = $data['fecha_vencimiento'] ?? date('Y-m-d');
-        
-        if (empty($predios)) {
+        try {
+            $input = file_get_contents('php://input');
+            $data = json_decode($input, true);
+            
+            error_log('[ARBITRIOS] === GENERAR RECIBOS CAJA ===');
+            error_log('[ARBITRIOS] Datos: ' . print_r($data, true));
+            
+            $predios = $data['predios'] ?? [];
+            $idCajero = $data['id_cajero'] ?? 1;
+            $fechaVencimiento = $data['fecha_vencimiento'] ?? date('Y-m-d');
+            
+            if (empty($predios)) {
             echo json_encode(['error' => 'No hay predios seleccionados']);
             exit;
         }
@@ -1306,7 +1459,7 @@ public function generarRecibosCaja() {
         foreach ($predios as $idPredio) {
             error_log('[ARBITRIOS] Buscando deudas para predio: ' . $idPredio);
             
-            // Consulta más simple y segura
+            
             $sqlDeudas = "SELECT 
                             ad.id_arbitrio_detalle,
                             ad.monto_final,
@@ -1317,7 +1470,7 @@ public function generarRecibosCaja() {
                          INNER JOIN gen.gen_predio p ON p.id = a.id_predio
                          WHERE a.id_predio = :id_predio
                          AND ad.monto_final > 0
-                         LIMIT 10"; // Límite por seguridad
+                         LIMIT 10"; 
             
             $deudas = $this->modelo->query($sqlDeudas, ['id_predio' => $idPredio]);
             
@@ -1331,7 +1484,7 @@ public function generarRecibosCaja() {
             foreach ($deudas as $deuda) {
                 error_log('[ARBITRIOS] Generando recibo para deuda ID: ' . $deuda['id_arbitrio_detalle']);
                 
-                // Generar recibo SIMPLIFICADO (sin auditoría problemática)
+                
                 $idRecibo = $this->generarReciboSimple($idCajero, $deuda, $fechaVencimiento);
                 
                 if ($idRecibo) {
@@ -1365,23 +1518,30 @@ public function generarRecibosCaja() {
             'error' => 'Error: ' . $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ]);
+        
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] ERROR generarRecibosCaja: ' . $e->getMessage());
+            echo json_encode([
+                'success' => false,
+                'error' => 'Error: ' . $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+        
+        exit;
     }
-    
-    exit;
-}
 
-// Método SIMPLIFICADO para generar recibo (sin problemas de auditoría)
-private function generarReciboSimple($idCajero, $deuda, $fechaVencimiento) {
-    try {
-        // 1. Obtener número de recibo
-        $sqlNumero = "SELECT numeracion_actual_recibo + 1 as siguiente 
-                     FROM caj.cajero 
-                     WHERE id = :id_cajero";
+    private function generarReciboSimple($idCajero, $deuda, $fechaVencimiento) {
+        try {
+            
+            $sqlNumero = "SELECT numeracion_actual_recibo + 1 as siguiente 
+                         FROM caj.cajero 
+                         WHERE id = :id_cajero";
+            
+            $resultNumero = $this->modelo->query($sqlNumero, ['id_cajero' => $idCajero]);
+            $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
         
-        $resultNumero = $this->modelo->query($sqlNumero, ['id_cajero' => $idCajero]);
-        $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
         
-        // 2. Crear pago simple
         $sqlPago = "INSERT INTO caj.pago 
                    (id_usuario, id_cajero, id_tipo_pago, fecha_pago, total, observaciones)
                    VALUES (
@@ -1406,7 +1566,7 @@ private function generarReciboSimple($idCajero, $deuda, $fechaVencimiento) {
         
         $idPago = $pago[0]['id'];
         
-        // 3. Crear recibo simple
+        
         $sqlRecibo = "INSERT INTO caj.recibo 
                      (id_pago, id_cajero, numero_recibo, fecha_emision, total, estado)
                      VALUES (:id_pago, :id_cajero, :numero_recibo, CURRENT_DATE, :total, 'PENDIENTE')
@@ -1419,7 +1579,7 @@ private function generarReciboSimple($idCajero, $deuda, $fechaVencimiento) {
             'total' => $deuda['monto_final']
         ]);
         
-        // 4. Actualizar numeración
+        
         $sqlActualizarCajero = "UPDATE caj.cajero 
                                SET numeracion_actual_recibo = :numero_recibo 
                                WHERE id = :id_cajero";
@@ -1429,33 +1589,33 @@ private function generarReciboSimple($idCajero, $deuda, $fechaVencimiento) {
             'id_cajero' => $idCajero
         ]);
         
-        error_log('[ARBITRIOS] Recibo generado: #' . $numeroRecibo . ' ID: ' . $recibo[0]['id']);
-        
-        return $recibo[0]['id'];
-        
-    } catch (Exception $e) {
-        error_log('[ARBITRIOS] Error generarReciboSimple: ' . $e->getMessage());
-        return null;
+            error_log('[ARBITRIOS] Recibo generado: #' . $numeroRecibo . ' ID: ' . $recibo[0]['id']);
+            
+            return $recibo[0]['id'];
+            
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error generarReciboSimple: ' . $e->getMessage());
+            return null;
+        }
     }
-}
 
-    // Método para generar recibo individual (faltaba)
-// Agrega este método en tu clase ArbitriosController
-private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
-    error_log('[ARBITRIOS] generandoReciboIndividual para cajero: ' . $idCajero);
     
-    try {
-        // 1. Obtener siguiente número de recibo
-        $sqlNumero = "SELECT numeracion_actual_recibo + 1 as siguiente 
-                     FROM caj.cajero 
-                     WHERE id = :id_cajero";
+
+    private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
+        error_log('[ARBITRIOS] generandoReciboIndividual para cajero: ' . $idCajero);
         
-        $resultNumero = $this->modelo->query($sqlNumero, ['id_cajero' => $idCajero]);
-        $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
+        try {
+            
+            $sqlNumero = "SELECT numeracion_actual_recibo + 1 as siguiente 
+                         FROM caj.cajero 
+                         WHERE id = :id_cajero";
+            
+            $resultNumero = $this->modelo->query($sqlNumero, ['id_cajero' => $idCajero]);
+            $numeroRecibo = $resultNumero[0]['siguiente'] ?? 1;
+            
+            error_log('[ARBITRIOS] Número recibo: ' . $numeroRecibo);
         
-        error_log('[ARBITRIOS] Número recibo: ' . $numeroRecibo);
         
-        // 2. Crear pago
         $sqlPago = "INSERT INTO caj.pago 
                    (id_usuario, id_cajero, id_tipo_pago, fecha_pago, total, observaciones)
                    VALUES (
@@ -1482,7 +1642,7 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
         $idPago = $pago[0]['id'];
         error_log('[ARBITRIOS] Pago creado ID: ' . $idPago);
         
-        // 3. Buscar concepto de pago para arbitrios
+        
         $sqlConcepto = "SELECT id FROM caj.concepto_pago 
                        WHERE descripcion ILIKE '%arbitrio%' 
                        LIMIT 1";
@@ -1490,7 +1650,7 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
         $concepto = $this->modelo->query($sqlConcepto);
         $idConcepto = $concepto[0]['id'] ?? 1;
         
-        // 4. Crear detalle del pago
+        
         $sqlDetalle = "INSERT INTO caj.pago_detalle 
                       (id_pago, id_concepto_pago, cantidad, subtotal)
                       VALUES (:id_pago, :id_concepto, 1, :subtotal)";
@@ -1501,7 +1661,7 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
             'subtotal' => $deuda['monto_final']
         ]);
         
-        // 5. Generar recibo
+        
         $sqlRecibo = "INSERT INTO caj.recibo 
                      (id_pago, id_cajero, numero_recibo, fecha_emision, total, estado)
                      VALUES (:id_pago, :id_cajero, :numero_recibo, CURRENT_DATE, :total, 'PENDIENTE')
@@ -1521,7 +1681,7 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
         $idRecibo = $recibo[0]['id'];
         error_log('[ARBITRIOS] Recibo creado ID: ' . $idRecibo);
         
-        // 6. Actualizar numeración del cajero
+        
         $sqlActualizarCajero = "UPDATE caj.cajero 
                                SET numeracion_actual_recibo = :numero_recibo 
                                WHERE id = :id_cajero";
@@ -1531,7 +1691,7 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
             'id_cajero' => $idCajero
         ]);
         
-        // 7. Registrar auditoría SIMPLIFICADA (sin el atributo problemático)
+        
         try {
             $sqlAuditoria = "INSERT INTO caj.auditoria 
                            (tabla, operacion, registro_id, usuario_bd, fecha, descripcion)
@@ -1541,7 +1701,7 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
                 'id_recibo' => $idRecibo,
                 'descripcion' => json_encode([
                     'predio' => $deuda['codigo_catastral'],
-                    // 'contribuyente' => OMITIDO TEMPORALMENTE,
+                    
                     'monto' => $deuda['monto_final'],
                     'fecha_vencimiento' => $fechaVencimiento,
                     'id_contribuyente' => $deuda['id_contribuyente']
@@ -1551,18 +1711,18 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
             error_log('[ARBITRIOS] Auditoría registrada para recibo: ' . $idRecibo);
             
         } catch (Exception $e) {
-            // No romper si falla la auditoría
+            
             error_log('[ARBITRIOS] Error en auditoría (no crítico): ' . $e->getMessage());
         }
         
-        return $idRecibo;
-        
-    } catch (Exception $e) {
-        error_log('[ARBITRIOS] Error en generarReciboIndividual: ' . $e->getMessage());
-        return null;
+            return $idRecibo;
+            
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en generarReciboIndividual: ' . $e->getMessage());
+            return null;
+        }
     }
-}
-    // Método auxiliar para obtener nombre del tributo
+    
     private function getNombreTributo($idTributo) {
         $tributos = [
             1 => 'Limpieza Pública',
@@ -1573,7 +1733,449 @@ private function generarReciboIndividual($idCajero, $deuda, $fechaVencimiento) {
         
         return $tributos[$idTributo] ?? 'Arbitrios';
     }
+
+    
+
+    public function getCatalogos() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        try {
+            $tributos = $this->modelo->mostrar("arb.tributo", "ORDER BY id_tributo");
+            
+            $categorias = [];
+            foreach ($tributos as $trib) {
+                $id_trib = $trib['id_tributo'];
+                $cats = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo = $id_trib ORDER BY id_tipo_beneficio");
+                $categorias[$id_trib] = $cats;
+            }
+            
+            $exoneraciones = $this->modelo->mostrar("arb.tipo_beneficio", "id_tributo IS NULL ORDER BY id_tipo_beneficio");
+            
+            echo json_encode([
+                'success' => true,
+                'tributos' => $tributos,
+                'categorias' => $categorias,
+                'exoneraciones' => $exoneraciones
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function cuentaCorriente() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $idContribuyente = $_GET['id_contribuyente'] ?? null;
+        $idPredio = $_GET['id_predio'] ?? null;
+        
+        if (!$idContribuyente) {
+            echo json_encode(['success' => false, 'error' => 'Falta id_contribuyente']);
+            exit;
+        }
+        
+        try {
+            $wherePredio = $idPredio ? "AND p.id = $idPredio" : "";
+            
+            $sql = "
+                SELECT 
+                    ad.id_arbitrio_detalle, ad.anio, ad.item,
+                    p.codigo_catastral, 
+                    COALESCE(v.nombre, '') || ' ' || COALESCE(p.numero, '') as direccion,
+                    COALESCE(tb_lp.denominacion, '') as tributo_limpieza,
+                    COALESCE(tb_pj.denominacion, '') as tributo_parques,
+                    COALESCE(tb_rs.denominacion, '') as tributo_residuos,
+                    COALESCE(tb_se.denominacion, '') as tributo_serenazgo,
+                    ad.monto_base, ad.interes, ad.mora, ad.monto_final,
+                    COALESCE(ad.monto_pagado, 0) as monto_pagado,
+                    (ad.monto_final - COALESCE(ad.monto_pagado, 0)) as saldo_pendiente,
+                    ad.estado_pago,
+                    TO_CHAR(ad.fecha_actualizado, 'YYYY-MM-DD') as fecha_emision
+                FROM arb.arbitrio_detalle ad
+                INNER JOIN arb.arbitrio a ON ad.id_arbitrio = a.id_arbitrio
+                INNER JOIN gen.gen_predio p ON a.id_predio = p.id
+                LEFT JOIN gen.gen_via v ON p.id_via = v.id
+                LEFT JOIN arb.tipo_beneficio tb_lp ON ad.id_tipo_beneficio_limpieza_publica = tb_lp.id_tipo_beneficio
+                LEFT JOIN arb.tipo_beneficio tb_pj ON ad.id_tipo_beneficio_parques_jardines = tb_pj.id_tipo_beneficio
+                LEFT JOIN arb.tipo_beneficio tb_rs ON ad.id_tipo_beneficio_relleno_sanitario = tb_rs.id_tipo_beneficio
+                LEFT JOIN arb.tipo_beneficio tb_se ON ad.id_tipo_beneficio_serenazgo = tb_se.id_tipo_beneficio
+                WHERE a.id_contribuyente = $idContribuyente $wherePredio
+                ORDER BY ad.anio DESC, ad.item DESC
+            ";
+            
+            $datos = $this->modelo->consultaPersonalizada($sql);
+            
+            $totalMontoPendiente = 0;
+            $totalMontoFinal = 0;
+            foreach ($datos as $row) {
+                $totalMontoPendiente += $row['saldo_pendiente'];
+                $totalMontoFinal += $row['monto_final'];
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'datos' => $datos,
+                'totales' => [
+                    'total_emitido' => $totalMontoFinal,
+                    'total_pagado' => $totalMontoFinal - $totalMontoPendiente,
+                    'total_pendiente' => $totalMontoPendiente
+                ]
+            ]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en cuentaCorriente: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function recaudacion() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $anio = $_GET['anio'] ?? date('Y');
+        $mes = $_GET['mes'] ?? null;
+        $ubigeo = $_GET['ubigeo'] ?? null;
+        
+        try {
+            $whereMes = $mes ? "AND EXTRACT(MONTH FROM ad.fecha_actualizado) = $mes" : "";
+            $whereUbigeo = $ubigeo ? "AND p.ubigeo = '$ubigeo'" : "";
+            
+            
+            $sql = "
+                SELECT 
+                    NULL::int as id_tributo,
+                    'Arbitrios'::varchar as tributo,
+                    EXTRACT(MONTH FROM ad.fecha_actualizado) as mes,
+                    COUNT(ad.id_arbitrio_detalle) as cantidad_registros,
+                    SUM(ad.monto_base) as total_base,
+                    SUM(ad.interes) as total_interes,
+                    SUM(ad.mora) as total_mora,
+                    SUM(ad.monto_final) as total_emitido,
+                    SUM(COALESCE(ad.monto_pagado, 0)) as total_pagado,
+                    SUM(ad.monto_final - COALESCE(ad.monto_pagado, 0)) as total_pendiente
+                FROM arb.arbitrio_detalle ad
+                INNER JOIN arb.arbitrio a ON ad.id_arbitrio = a.id_arbitrio
+                INNER JOIN gen.gen_predio p ON a.id_predio = p.id
+                WHERE EXTRACT(YEAR FROM ad.fecha_actualizado) = $anio $whereMes $whereUbigeo
+                GROUP BY mes
+                ORDER BY mes DESC
+            ";
+            
+            $recaudacion = $this->modelo->consultaPersonalizada($sql);
+            
+            echo json_encode([
+                'success' => true,
+                'anio' => $anio,
+                'datos' => $recaudacion
+            ]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en recaudacion: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function notificar() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $idContribuyente = $_GET['id_contribuyente'] ?? null;
+        
+        if (!$idContribuyente) {
+            echo json_encode(['success' => false, 'error' => 'Falta id_contribuyente']);
+            exit;
+        }
+        
+        try {
+            $sqlContrib = "SELECT email, nombre FROM gen.gen_contribuyente WHERE id = $idContribuyente";
+            $contrib = $this->modelo->consultaPersonalizada($sqlContrib);
+            
+            if (empty($contrib)) {
+                echo json_encode(['success' => false, 'error' => 'Contribuyente no encontrado']);
+                exit;
+            }
+            
+            $email = $contrib[0]['email'] ?? 'no-email@test.com';
+            $nombre = $contrib[0]['nombre'];
+            
+            $sqlSaldo = "
+                SELECT SUM(ad.monto_final - COALESCE(ad.monto_pagado, 0)) as saldo
+                FROM arb.arbitrio_detalle ad
+                INNER JOIN arb.arbitrio a ON ad.id_arbitrio = a.id_arbitrio
+                WHERE a.id_contribuyente = $idContribuyente
+            ";
+            $saldo = $this->modelo->consultaPersonalizada($sqlSaldo);
+            $montoPendiente = $saldo[0]['saldo'] ?? 0;
+            
+            error_log("[NOTIF] Correo a $email: Notificación de Arbitrios - Monto pendiente: S/. " . number_format($montoPendiente, 2));
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'Notificación enviada a ' . $email,
+                'email' => $email,
+                'monto_pendiente' => $montoPendiente
+            ]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en notificar: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function procesarPago() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $data = json_decode(file_get_contents('php://input'), true);
+        $idDetalles = $data['id_detalles'] ?? [];
+        $montoPagado = $data['monto_pagado'] ?? 0;
+        $referencia = $data['referencia_pago'] ?? 'Manual';
+        
+        if (empty($idDetalles)) {
+            echo json_encode(['success' => false, 'error' => 'Seleccione al menos un arbitrio']);
+            exit;
+        }
+        
+        try {
+            foreach ($idDetalles as $idDetalle) {
+                $sqlObtener = "SELECT monto_final, COALESCE(monto_pagado, 0) as monto_pagado FROM arb.arbitrio_detalle WHERE id_arbitrio_detalle = $idDetalle";
+                $detalle = $this->modelo->consultaPersonalizada($sqlObtener);
+                
+                if (!empty($detalle)) {
+                    $montoFinal = $detalle[0]['monto_final'];
+                    $montoPagActual = $detalle[0]['monto_pagado'];
+                    $montoNuevoPagado = min($montoPagActual + $montoPagado, $montoFinal);
+                    $estadoPago = ($montoNuevoPagado >= $montoFinal) ? 'pagado' : 'parcial';
+                    
+                    $sqlUpdate = "
+                        UPDATE arb.arbitrio_detalle
+                        SET monto_pagado = $montoNuevoPagado,
+                            estado_pago = '$estadoPago',
+                            usuario_actualizado = 'CAJA',
+                            fecha_actualizado = CURRENT_TIMESTAMP
+                        WHERE id_arbitrio_detalle = $idDetalle
+                    ";
+                    
+                    $this->modelo->query($sqlUpdate);
+                }
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'Pago procesado correctamente',
+                'detalles_actualizados' => count($idDetalles),
+                'referencia' => $referencia
+            ]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en procesarPago: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function clonarCategorizacion() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $data = json_decode(file_get_contents('php://input'), true);
+        $idDetalleOriginal = $data['id_arbitrio_detalle'] ?? null;
+        $nuevoAnio = $data['nuevo_anio'] ?? null;
+        $nuevoItem = $data['nuevo_item'] ?? null;
+        
+        if (!$idDetalleOriginal || !$nuevoAnio || !$nuevoItem) {
+            echo json_encode(['success' => false, 'error' => 'Faltan parámetros']);
+            exit;
+        }
+        
+        try {
+            $sqlOriginal = "
+                SELECT ad.*, a.id_contribuyente, a.id_predio, a.id_tipo_registro_origen
+                FROM arb.arbitrio_detalle ad
+                INNER JOIN arb.arbitrio a ON ad.id_arbitrio = a.id_arbitrio
+                WHERE ad.id_arbitrio_detalle = $idDetalleOriginal
+            ";
+            
+            $original = $this->modelo->consultaPersonalizada($sqlOriginal);
+            
+            if (empty($original)) {
+                echo json_encode(['success' => false, 'error' => 'Detalle no encontrado']);
+                exit;
+            }
+            
+            $orig = $original[0];
+            
+            
+            $sqlArbitrio = "
+                SELECT id_arbitrio FROM arb.arbitrio
+                WHERE id_contribuyente = " . $orig['id_contribuyente'] . " 
+                  AND id_predio = " . $orig['id_predio'] . " 
+                  AND anio = $nuevoAnio
+                LIMIT 1
+            ";
+            
+            $arbitrioNuevo = $this->modelo->consultaPersonalizada($sqlArbitrio);
+            $idArbitrioNuevo = null;
+            
+            if (!empty($arbitrioNuevo)) {
+                $idArbitrioNuevo = $arbitrioNuevo[0]['id_arbitrio'];
+            } else {
+                $sqlMaxId = "SELECT COALESCE(MAX(id_arbitrio), 0) + 1 as next_id FROM arb.arbitrio";
+                $nextId = $this->modelo->consultaPersonalizada($sqlMaxId);
+                $idArbitrioNuevo = $nextId[0]['next_id'];
+                
+                $sqlInsertArb = "
+                    INSERT INTO arb.arbitrio (
+                        id_arbitrio, id_contribuyente, id_predio, id_tipo_registro_origen,
+                        anio, estado, observacion, usuario_actualizado
+                    ) VALUES (
+                        $idArbitrioNuevo, " . $orig['id_contribuyente'] . ", " . $orig['id_predio'] . ", " . $orig['id_tipo_registro_origen'] . ",
+                        $nuevoAnio, 'activo', 'Clonado de año anterior', 'CLONAR'
+                    )
+                ";
+                
+                $this->modelo->query($sqlInsertArb);
+            }
+            
+            
+            $sqlMaxDet = "SELECT COALESCE(MAX(id_arbitrio_detalle), 0) + 1 as next_id FROM arb.arbitrio_detalle";
+            $nextDet = $this->modelo->consultaPersonalizada($sqlMaxDet);
+            $idDetalleNuevo = $nextDet[0]['next_id'];
+            
+            $campos = [];
+            $valores = [];
+            $campos[] = "id_arbitrio_detalle"; $valores[] = $idDetalleNuevo;
+            $campos[] = "id_arbitrio"; $valores[] = $idArbitrioNuevo;
+            $campos[] = "id_tipo_beneficio_limpieza_publica"; $valores[] = $orig['id_tipo_beneficio_limpieza_publica'] ?: 'NULL';
+            $campos[] = "id_tipo_beneficio_parques_jardines"; $valores[] = $orig['id_tipo_beneficio_parques_jardines'] ?: 'NULL';
+            $campos[] = "id_tipo_beneficio_relleno_sanitario"; $valores[] = $orig['id_tipo_beneficio_relleno_sanitario'] ?: 'NULL';
+            $campos[] = "id_tipo_beneficio_serenazgo"; $valores[] = $orig['id_tipo_beneficio_serenazgo'] ?: 'NULL';
+            $campos[] = "frentera_metros"; $valores[] = $orig['frentera_metros'] ?: 0;
+            $campos[] = "frecuencia_barrido"; $valores[] = $orig['frecuencia_barrido'] ?: 1;
+            $campos[] = "nro_habitantes"; $valores[] = $orig['nro_habitantes'] ?: 0;
+            $campos[] = "area_construida"; $valores[] = $orig['area_construida'] ?: 0;
+            $campos[] = "area_terreno"; $valores[] = $orig['area_terreno'] ?: 0;
+            $campos[] = "tiene_licencia"; $valores[] = $orig['tiene_licencia'] ? 1 : 0;
+            $campos[] = "porcentaje_inseguridad"; $valores[] = $orig['porcentaje_inseguridad'] ?: 0;
+            $campos[] = "distancia_a_parque"; $valores[] = $orig['distancia_a_parque'] ?: 0;
+            $campos[] = "anio"; $valores[] = $nuevoAnio;
+            $campos[] = "item"; $valores[] = $nuevoItem;
+            $campos[] = "usuario_actualizado"; $valores[] = "'CLONAR'";
+            
+            
+            for ($m = 1; $m <= 12; $m++) {
+                $mes = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][$m-1];
+                $campos[] = $mes;
+                $valores[] = $orig[$mes] ? 1 : 0;
+            }
+            
+            $sqlInsertDet = "INSERT INTO arb.arbitrio_detalle (" . implode(", ", $campos) . ") VALUES (" . implode(", ", $valores) . ")";
+            $this->modelo->query($sqlInsertDet);
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'Categorización clonada correctamente',
+                'id_arbitrio_detalle_nuevo' => $idDetalleNuevo,
+                'anio' => $nuevoAnio,
+                'item' => $nuevoItem
+            ]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en clonarCategorizacion: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getLicencias() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $idContribuyente = $_GET['id'] ?? null;
+        
+        if (!$idContribuyente) {
+            echo json_encode(['success' => false, 'error' => 'Falta ID del contribuyente']);
+            exit;
+        }
+        
+        try {
+            $sql = "
+                SELECT DISTINCT
+                    p.id as id,
+                    p.id as id_predio,
+                    p.codigo_catastral as codigo,
+                    TRIM(COALESCE(v.nombre, '') || ' ' || COALESCE(p.numero, '')) as direccion,
+                    CONCAT('Predio ID: ', p.id, ' | Estado: ', p.estado) as adicional
+                FROM gen.gen_predio p
+                LEFT JOIN gen.gen_via v ON v.id = p.id_via
+                LEFT JOIN arb.arbitrio a ON a.id_predio = p.id AND a.id_contribuyente = :id_contribuyente
+                WHERE p.estado = 'Activo'
+                  AND a.id_arbitrio IS NULL
+                ORDER BY p.id DESC
+                LIMIT 20
+            ";
+            
+            $predios = $this->modelo->query($sql, ['id_contribuyente' => $idContribuyente]);
+            
+            echo json_encode([
+                'success' => true,
+                'data' => $predios,
+                'total' => count($predios)
+            ]);
+        } catch (Exception $e) {
+            error_log('[ARBITRIOS] Error en getLicencias: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function preCalcular() {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $data = json_decode(file_get_contents('php://input'), true);
+        
+        $frentera = (float)($data['frentera_metros'] ?? 0);
+        $frecuencia = (int)($data['frecuencia_barrido'] ?? 1);
+        $areaConstructida = (float)($data['area_construida'] ?? 0);
+        $areTerreno = (float)($data['area_terreno'] ?? 0);
+        $distancia = (float)($data['distancia_a_parque'] ?? 1000);
+        $inseguridad = (float)($data['porcentaje_inseguridad'] ?? 0);
+        
+        $mesesAfectos = 0;
+        for ($m = 1; $m <= 12; $m++) {
+            $mes = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][$m-1];
+            if ($data[$mes] ?? false) $mesesAfectos++;
+        }
+        
+        if ($mesesAfectos == 0) {
+            echo json_encode(['success' => false, 'error' => 'Debe marcar al menos un mes']);
+            exit;
+        }
+        
+        try {
+            $montLimpieza = $frentera * $frecuencia * 0.85 * ($mesesAfectos / 12);
+            $montParques = 20 * $mesesAfectos;
+            $montResiduos = $areaConstructida * 0.30 * ($mesesAfectos / 12);
+            $montSerenazgo = ($inseguridad / 100) * 50 * $mesesAfectos;
+            
+            $montoBase = $montLimpieza + $montParques + $montResiduos + $montSerenazgo;
+            $interes = $montoBase * 0.02 * ($mesesAfectos / 12);
+            $mora = $montoBase * 0.01 * ($mesesAfectos / 12);
+            $montoFinal = $montoBase + $interes + $mora;
+            
+            echo json_encode([
+                'success' => true,
+                'meses_afectos' => $mesesAfectos,
+                'montos' => [
+                    'limpieza' => round($montLimpieza, 2),
+                    'parques' => round($montParques, 2),
+                    'residuos' => round($montResiduos, 2),
+                    'serenazgo' => round($montSerenazgo, 2),
+                    'base' => round($montoBase, 2),
+                    'interes' => round($interes, 2),
+                    'mora' => round($mora, 2),
+                    'final' => round($montoFinal, 2)
+                ]
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
 }
 
-
 ?>
+

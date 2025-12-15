@@ -1,3 +1,9 @@
+<?php
+// Definir BASE_URL si no existe
+if (!defined('BASE_URL')) {
+    define('BASE_URL', URL_SITE);
+}
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>

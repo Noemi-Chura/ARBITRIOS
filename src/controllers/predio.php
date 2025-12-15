@@ -9,21 +9,21 @@ class PredioController {
         $this->modelo = new Modelo();
     }
 
-    // Listar predios
+    
     public function index() {
         $dato = $this->modelo->mostrar("gen.gen_predio", "1=1");
         require_once(__DIR__ . "/../views/predio/predio.php");
     }
 
-    // Formulario nuevo predio
+    
     public function nuevo() {
-        // Para selects
+        
         $vias = $this->modelo->mostrar("gen.gen_via", "estado='Activo'");
         $sectores = $this->modelo->mostrar("gen.gen_sector", "estado='Activo'");
         $habilitaciones = $this->modelo->mostrar("gen.gen_habilitacion_urbana", "estado='Activo'");
         $tipos_interior = $this->modelo->mostrar("gen.gen_tipo_interior", "1=1");
         
-        // Obtener departamentos, provincias y distritos para selects
+        
         $departamentos = $this->modelo->mostrar("gen.gen_departamento", "1=1");
         $provincias = $this->modelo->mostrar("gen.gen_provincia", "1=1");
         $distritos = $this->modelo->mostrar("gen.gen_distrito", "1=1");
@@ -31,14 +31,14 @@ class PredioController {
         require_once(__DIR__ . "/../views/predio/nuevoPredio.php");
     }
 
-    // Guardar nuevo predio
+    
     public function guardar() {
-        // Función para convertir valores vacíos a null
+        
         function toNullIfEmpty($value) {
             return ($value === '' || $value === null) ? null : $value;
         }
         
-        // Convertir valores vacíos a null para campos enteros
+        
         $id_via = toNullIfEmpty($_POST["id_via"] ?? '');
         $id_sector = toNullIfEmpty($_POST["id_sector"] ?? '');
         $id_habilitacion_urbana = toNullIfEmpty($_POST["id_habilitacion_urbana"] ?? '');
@@ -93,7 +93,7 @@ class PredioController {
             $id_distrito
         ];
 
-        // Validar campos requeridos
+        
         if (empty($_POST["nombre_predio"]) || !$id_habilitacion_urbana || !$id_departamento || !$id_provincia || !$id_distrito) {
             $_SESSION['flash_message'] = "Error: Campos requeridos faltantes";
             $_SESSION['flash_type'] = 'error';
@@ -102,7 +102,7 @@ class PredioController {
         }
 
         try {
-            // Construir la consulta SQL manualmente para excluir el campo id
+            
             $cols = implode(", ", $columnas);
             $placeholders = rtrim(str_repeat('?, ', count($valores)), ', ');
             
@@ -130,7 +130,7 @@ class PredioController {
         }
     }
 
-    // Formulario editar predio
+    
     public function editar() {
         $id = $_GET["id"] ?? '';
         if (!$id) {
@@ -148,7 +148,7 @@ class PredioController {
         $habilitaciones = $this->modelo->mostrar("gen.gen_habilitacion_urbana", "estado='Activo'");
         $tipos_interior = $this->modelo->mostrar("gen.gen_tipo_interior", "1=1");
         
-        // Obtener departamentos, provincias y distritos para selects
+        
         $departamentos = $this->modelo->mostrar("gen.gen_departamento", "1=1");
         $provincias = $this->modelo->mostrar("gen.gen_provincia", "1=1");
         $distritos = $this->modelo->mostrar("gen.gen_distrito", "1=1");
@@ -156,9 +156,9 @@ class PredioController {
         require_once(__DIR__ . "/../views/predio/editarPredio.php");
     }
 
-    // Actualizar predio
+    
     public function actualizar() {
-        // Función para convertir valores vacíos a null
+        
         function toNullIfEmpty($value) {
             return ($value === '' || $value === null) ? null : $value;
         }
@@ -171,7 +171,7 @@ class PredioController {
             exit;
         }
 
-        // Convertir valores vacíos a null para campos enteros
+        
         $id_via = toNullIfEmpty($_POST["id_via"] ?? '');
         $id_sector = toNullIfEmpty($_POST["id_sector"] ?? '');
         $id_habilitacion_urbana = toNullIfEmpty($_POST["id_habilitacion_urbana"] ?? '');
@@ -203,7 +203,7 @@ class PredioController {
             "id_distrito" => $id_distrito
         ];
 
-        // Validar campos requeridos
+        
         if (empty($_POST["nombre_predio"]) || !$id_habilitacion_urbana || !$id_departamento || !$id_provincia || !$id_distrito) {
             $_SESSION['flash_message'] = "Error: Campos requeridos faltantes";
             $_SESSION['flash_type'] = 'error';
@@ -233,7 +233,7 @@ class PredioController {
         }
     }
 
-    // Eliminar predio
+    
     public function eliminar() {
         $id = $_GET["id"] ?? '';
         if (!$id) {
@@ -263,3 +263,4 @@ class PredioController {
     }
 }
 ?>
+

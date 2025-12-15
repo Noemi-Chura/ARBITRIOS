@@ -9,13 +9,13 @@ class ContribuyenteController {
         $this->modelo = new Modelo();
     }
 
-    // Mostrar lista de contribuyentes
+    
     public function index() {
         $busqueda = $_GET['busqueda'] ?? '';
         $condicion = "1=1";
         
         if (!empty($busqueda)) {
-            // Buscar por nombre, DNI o RUC
+            
             $busquedaSegura = addslashes($busqueda);
             $condicion = "(nombre ILIKE '%{$busquedaSegura}%' OR 
                           dni ILIKE '%{$busquedaSegura}%' OR 
@@ -27,15 +27,14 @@ class ContribuyenteController {
         require_once(__DIR__ . "/../views/contribuyente/contribuyente.php");
     }
 
-
-    // Mostrar formulario para nuevo contribuyente
+    
     public function nuevo() {
         require_once(__DIR__ . "/../views/contribuyente/nuevoContribuyente.php");
     }
 
-    // Guardar nuevo contribuyente
+    
     public function guardar() {
-        // Reemplazar valores vacíos por null
+        
         $dni = $_POST["dni"] ?? null;
         if ($dni === '') $dni = null;
 
@@ -63,7 +62,7 @@ class ContribuyenteController {
         $observaciones = $_POST["observaciones"] ?? null;
         if ($observaciones === '') $observaciones = null;
 
-        // Columnas a insertar
+        
         $columnas = [
             "nombre",
             "genero",
@@ -80,7 +79,7 @@ class ContribuyenteController {
             "observaciones"
         ];
 
-        // Valores a insertar
+        
         $valores = [
             $_POST["nombre"],
             $_POST["genero"],
@@ -97,15 +96,15 @@ class ContribuyenteController {
             $observaciones
         ];
 
-        // Insertar en la base de datos
+        
         $this->modelo->insertar("gen.gen_contribuyente", $columnas, $valores);
 
-        // Redirigir después de insertar
+        
         header("Location: index.php?c=contribuyente&m=index");
         exit;
     }
 
-    // Mostrar formulario para editar
+    
     public function editar() {
         $id = $_GET["id"];
         $dato = $this->modelo->mostrarUno("gen.gen_contribuyente", "id='$id'");
@@ -117,11 +116,11 @@ class ContribuyenteController {
         require_once(__DIR__ . "/../views/contribuyente/editarContribuyente.php");
     }
 
-    // Actualizar contribuyente
+    
     public function actualizar() {
         $id = $_POST["id"];
 
-        // Reemplazar valores vacíos por null
+        
         $dni = $_POST["dni"] ?? null;
         if ($dni === '') $dni = null;
 
@@ -149,7 +148,7 @@ class ContribuyenteController {
         $observaciones = $_POST["observaciones"] ?? null;
         if ($observaciones === '') $observaciones = null;
 
-        // Datos a actualizar
+        
         $data = [
             "nombre" => $_POST["nombre"],
             "genero" => $_POST["genero"],
@@ -172,7 +171,7 @@ class ContribuyenteController {
         exit;
     }
 
-    // Eliminar contribuyente
+    
     public function eliminar() {
         $id = $_GET["id"];
         $this->modelo->eliminar("gen.gen_contribuyente", "id='$id'");
@@ -182,3 +181,4 @@ class ContribuyenteController {
     }
 }
 ?>
+

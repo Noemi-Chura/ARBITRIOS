@@ -1,10 +1,10 @@
 <?php
-class Modelo {
+class Database {
     private $db;
 
     public function __construct() {
         try {
-            // Conexión al contenedor postgres_local
+            
             $this->db = new PDO(
                 "pgsql:host=postgres;
                 port=5432;
@@ -18,7 +18,7 @@ class Modelo {
         }
     }
 
-    // INSERTAR REGISTRO
+    
     public function insertar($tabla, $columnas, $valores) {
         $cols = implode(",", $columnas);
         $marcadores = rtrim(str_repeat('?,', count($valores)), ',');
@@ -34,7 +34,7 @@ class Modelo {
         }
     }
 
-    // MOSTRAR TODO
+    
     public function mostrar($tabla, $condicion = "1=1") {
         $sql = "SELECT * FROM $tabla WHERE $condicion";
         try {
@@ -46,7 +46,7 @@ class Modelo {
         }
     }
 
-    // MOSTRAR UNO
+    
     public function mostrarUno($tabla, $condicion) {
         $sql = "SELECT * FROM $tabla WHERE $condicion LIMIT 1";
         try {
@@ -58,7 +58,7 @@ class Modelo {
         }
     }
 
-    // ACTUALIZAR
+    
     public function actualizar($tabla, $data, $condicion) {
         $campos = [];
         foreach ($data as $col => $val) {
@@ -76,7 +76,7 @@ class Modelo {
         }
     }
 
-    // ELIMINAR
+    
     public function eliminar($tabla, $condicion) {
         $sql = "DELETE FROM $tabla WHERE $condicion";
         try {
@@ -87,7 +87,7 @@ class Modelo {
         }
     }
 
-    // CONSULTA DIRECTA
+    
     public function consultaPersonalizada($sql) {
         try {
             $stmt = $this->db->prepare($sql);
@@ -110,3 +110,4 @@ class Modelo {
     }
 }
 ?>
+
