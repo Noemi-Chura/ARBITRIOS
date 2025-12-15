@@ -35,13 +35,16 @@ class Database {
     }
 
     
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function mostrar($tabla, $condicion = "1=1") {
         $sql = "SELECT * FROM $tabla WHERE $condicion";
         try {
             $stmt = $this->db->query($sql);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            echo "Error al mostrar: " . $e->getMessage();
+            error_log("Error al mostrar: " . $e->getMessage());
             return [];
         }
     }

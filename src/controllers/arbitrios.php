@@ -1023,6 +1023,7 @@ class ArbitriosController {
     
 
     public function procesarCuentaCorriente() {
+        ob_clean(); // Limpiar cualquier salida previa
         header('Content-Type: application/json');
         
         try {

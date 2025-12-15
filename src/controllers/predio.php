@@ -6,7 +6,7 @@ class PredioController {
     private $modelo;
 
     public function __construct() {
-        $this->modelo = new Modelo();
+        $this->modelo = new Database();
     }
 
     
